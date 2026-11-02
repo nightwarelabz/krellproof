@@ -56,7 +56,8 @@ so both sides of each comparison share buffers, protocol, and clock.
 
 Machine: Apple M1 (x86_64 binaries under Rosetta) -
 Apple clang 21.0.0 -O2 - Python 3.15.1 - NumPy 2.5.4 -
-Krell v2.0 development tree (WP1 vector lowering; x86_64 native lane).
+Krell v2.0 development tree (WP1 vector lowering; WP2 x86_64 backend
+code generation; x86_64 native lane).
 The C reference here is clang, not gcc: the opponent changed with
 the machine, and every number below is from this one run.
 
@@ -64,38 +65,44 @@ Best ns per call (lower is faster):
 
 | kernel | C -O0 | C -O1 | C -O2 | Krell native | Krell interp | Python | NumPy |
 |---|---|---|---|---|---|---|---|
-| fill32 | 706.0K | 328.1K | 66.3K | 66.5K | 291.97M | 15.76M | 63.8K |
-| span | 14.7K | 6.1K | 6.1K | 58.4K | 2.18M | 1.16M | 29.7K |
-| sumsq | 1.18M | 529.4K | 420.1K | 425.0K | 306.30M | 47.28M | 371.2K |
-| fib | 13.79M | 5.95M | 6.38M | 14.21M | 4.07G | 211.76M | -- |
-| histo | 3.67M | 1.38M | 1.17M | 4.94M | 1.45G | 93.26M | 6.39M |
-| fnv1a | 9.87M | 5.26M | 5.26M | 7.94M | 1.25G | 407.92M | -- |
+| fill32 | 706.2K | 328.1K | 66.2K | 66.5K | 278.28M | 15.81M | 65.4K |
+| span | 14.7K | 6.1K | 6.1K | 10.6K | 2.17M | 1.16M | 29.6K |
+| sumsq | 1.18M | 525.3K | 415.9K | 421.9K | 289.83M | 45.67M | 367.8K |
+| fib | 13.79M | 5.95M | 6.37M | 9.42M | 4.14G | 212.06M | -- |
+| histo | 3.65M | 1.38M | 1.19M | 1.48M | 1.42G | 93.64M | 6.84M |
+| fnv1a | 9.86M | 5.26M | 5.26M | 5.92M | 1.28G | 369.10M | -- |
 
 ## Reading the results
 
-- fill32 is at parity with clang -O2 (ratio 1.002 in this harness
-  run; a tuned unroll/access sweep reached 0.992, S = 1.008). Both
-  implementations move 4 MiB at ~64 GB/s -- the memory-bandwidth
-  roofline of the machine. There is no headroom left in this
-  domain for either side. Krell v1.1 measured 24.3x behind C on
-  this kernel and machine class; the gain came from vector
-  lowering in the optimizer (WP1), not from kernel changes -- the
-  kernels are byte-identical to the v1 run.
-- sumsq is at parity (1.012; the sweep reached 1.000). Krell now
-  emits the same instruction sequence clang does for the i64
-  reduction; beating it requires a different sequence, which is
-  superoptimizer work (WP3), not tuning.
-- The remaining gaps are the unworked domains: span 9.64x
-  (gather + fixed-point pipeline), histo 4.21x (read-modify-write
-  scatter), fib 2.23x (call overhead), fnv1a 1.51x (serial chain).
-  Register allocation, addressing-mode selection, and fragment
-  superoptimization are the scheduled mechanisms (WP2/WP3).
-- Headline: the geometric mean of S = T_C / T_Krell across the six
-  kernels is 0.44 on this run (44% of C speed overall), up from
-  0.18 for v1.1 measured the same way on this machine class.
+- fill32 is at parity with clang -O2 (ratio 1.005 in this harness
+  run). Both implementations move 4 MiB at ~64 GB/s -- the
+  memory-bandwidth roofline of the machine. There is no headroom
+  left in this domain for either side. Krell v1.1 measured 24.3x
+  behind C on this kernel and machine class; the gain came from
+  vector lowering in the optimizer (WP1), not from kernel
+  changes -- the kernels are byte-identical to the v1 run.
+- sumsq is at parity (1.014). Krell now emits the same instruction
+  sequence clang does for the i64 reduction; beating it requires
+  a different sequence, which is superoptimizer work (WP3), not
+  tuning.
+- WP2 (x86_64 backend code generation: condition-code fusion,
+  two-address register affinity, addressing-mode folding) closed
+  most of the remaining gaps. Against the v1.1 baseline on this
+  machine, span is 5.71x faster (now 1.75x behind C, was 9.64x),
+  histo 4.77x faster (1.25x behind, was 4.21x), and fib 1.66x
+  faster (1.48x behind, was 2.23x). fnv1a also improved to 1.12x
+  behind C (was 1.51x). No kernel regressed, and every checksum
+  is unchanged.
+- Headline: the geometric mean of S = T_C / T_Krell across the
+  six kernels is 0.804 on this run (80.4% of C speed overall),
+  up from 0.44 after WP1 and 0.235 for the v1.1 baseline measured
+  the same way on this machine class. Krell does not yet beat C
+  on this machine: the remaining gaps are span 1.75x, fib 1.48x,
+  histo 1.25x, and fnv1a 1.12x.
 - On the original bench machine (AMD EPYC, gcc -O2), the same
-  v2.0 toolchain measured fill32 at 0.313x and sumsq at 0.569x
-  vs C -O2 -- ahead of C -- because gcc's baseline-target
+  WP2 toolchain measured fill32 at 0.318x and sumsq at 0.572x
+  vs C -O2 -- ahead of C -- with span 5.33x, histo 4.19x, fib
+  2.60x, and fnv1a 1.04x, because gcc's baseline-target
   vectorization leaves headroom that clang on this machine does
   not. Both statements are true; they are measurements of
   different opponents, which is why the machine and compiler are
