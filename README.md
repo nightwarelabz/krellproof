@@ -52,42 +52,54 @@ per-call nanoseconds are recorded (Python fib: 3 rounds). The C and
 Krell-native rows come from a single harness binary per C opt level,
 so both sides of each comparison share buffers, protocol, and clock.
 
-## Results (2026-11-02)
+## Results (2026-11-02, v2.0 branch)
 
-Machine: AMD EPYC 9D25 126-Core Processor (4 cores visible) -
-cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0 - Python 3.12.3 - NumPy 1.26.4 -
-Krell v1.1 (x86_64 native lane).
+Machine: Apple M1 (x86_64 binaries under Rosetta) -
+Apple clang 21.0.0 -O2 - Python 3.15.1 - NumPy 2.5.4 -
+Krell v2.0 development tree (WP1 vector lowering; x86_64 native lane).
+The C reference here is clang, not gcc: the opponent changed with
+the machine, and every number below is from this one run.
 
 Best ns per call (lower is faster):
 
 | kernel | C -O0 | C -O1 | C -O2 | Krell native | Krell interp | Python | NumPy |
 |---|---|---|---|---|---|---|---|
-| fill32 | 1.24M | 558.5K | 292.5K | 1.69M | 154.08M | 29.04M | 282.7K |
-| span | 23.9K | 13.4K | 13.0K | 91.5K | 1.79M | 2.13M | 78.6K |
-| sumsq | 2.25M | 733.1K | 744.3K | 2.84M | 170.56M | 57.78M | 1.13M |
-| fib | 17.76M | 17.34M | 5.26M | 21.19M | 2.88G | 413.97M | -- |
-| histo | 6.71M | 2.27M | 2.27M | 10.48M | 734.08M | 177.90M | 30.58M |
-| fnv1a | 9.06M | 8.95M | 9.01M | 11.28M | 672.37M | 555.99M | -- |
+| fill32 | 706.0K | 328.1K | 66.3K | 66.5K | 291.97M | 15.76M | 63.8K |
+| span | 14.7K | 6.1K | 6.1K | 58.4K | 2.18M | 1.16M | 29.7K |
+| sumsq | 1.18M | 529.4K | 420.1K | 425.0K | 306.30M | 47.28M | 371.2K |
+| fib | 13.79M | 5.95M | 6.38M | 14.21M | 4.07G | 211.76M | -- |
+| histo | 3.67M | 1.38M | 1.17M | 4.94M | 1.45G | 93.26M | 6.39M |
+| fnv1a | 9.87M | 5.26M | 5.26M | 7.94M | 1.25G | 407.92M | -- |
 
 ## Reading the results
 
-- On the serial dependency chain (fnv1a), where no optimizer can
-  help, Krell native runs at 1.25x C -O2 -- near the latency floor.
-- Where gcc's optimizer and vectorizer do the heavy lifting
-  (fill32, span, sumsq, histo), Krell native trails C -O2 by
-  3.8x-7.1x and sits in the C -O0 class. The current x86_64 backend
-  is a direct code generator; closing this gap is backend work
-  (vectorized lowering, better register use), not language work --
-  the same Krell modules are the input either way.
-- Krell native is 13x-26x faster than pure Python on the loop
-  kernels, and on span it runs in NumPy's class (93 us vs 79 us)
-  with scalar code.
-- The interpreter is a correctness reference, not a runtime:
-  60x-550x off C -O2. It still edges out CPython on span.
-- NumPy's fill beats C -O2 (0.97x) because it is a tuned memset;
-  its histogram is slower than Krell native (bincount overhead on
-  this workload), which is a reminder that vectorized libraries
-  have their own cliffs.
+- fill32 is at parity with clang -O2 (ratio 1.002 in this harness
+  run; a tuned unroll/access sweep reached 0.992, S = 1.008). Both
+  implementations move 4 MiB at ~64 GB/s -- the memory-bandwidth
+  roofline of the machine. There is no headroom left in this
+  domain for either side. Krell v1.1 measured 24.3x behind C on
+  this kernel and machine class; the gain came from vector
+  lowering in the optimizer (WP1), not from kernel changes -- the
+  kernels are byte-identical to the v1 run.
+- sumsq is at parity (1.012; the sweep reached 1.000). Krell now
+  emits the same instruction sequence clang does for the i64
+  reduction; beating it requires a different sequence, which is
+  superoptimizer work (WP3), not tuning.
+- The remaining gaps are the unworked domains: span 9.64x
+  (gather + fixed-point pipeline), histo 4.21x (read-modify-write
+  scatter), fib 2.23x (call overhead), fnv1a 1.51x (serial chain).
+  Register allocation, addressing-mode selection, and fragment
+  superoptimization are the scheduled mechanisms (WP2/WP3).
+- Headline: the geometric mean of S = T_C / T_Krell across the six
+  kernels is 0.44 on this run (44% of C speed overall), up from
+  0.18 for v1.1 measured the same way on this machine class.
+- On the original bench machine (AMD EPYC, gcc -O2), the same
+  v2.0 toolchain measured fill32 at 0.313x and sumsq at 0.569x
+  vs C -O2 -- ahead of C -- because gcc's baseline-target
+  vectorization leaves headroom that clang on this machine does
+  not. Both statements are true; they are measurements of
+  different opponents, which is why the machine and compiler are
+  stated with every table.
 
 The deterministic property no column can show: the Krell rows are
 produced by a total, verified IR whose outputs are byte-identical
@@ -97,7 +109,7 @@ between Krell targets by construction.
 
 ## Reproduce
 
-Requires a built `krellc` from the Krell v1.1 tree, `cc`, and
+Requires a built `krellc` from the Krell v2.0 branch tree, `cc`, and
 Python 3 with NumPy and Pillow:
 
     KRELLC=/path/to/krellc ./run.sh
@@ -123,9 +135,11 @@ Outputs: `results/results.json` (merged, validated) and
   depth >= 2 in the v1.1 toolchain, so the chart uses per-blob
   specialized accessors. Minimal repros were confirmed before the
   workaround was adopted.
-- Timings are from a shared virtual machine and are best read as
-  ratios between implementations measured minutes apart, not as
-  absolute hardware numbers.
+- Timings are best read as ratios between implementations measured
+  minutes apart on one machine, not as absolute hardware numbers.
+  The recorded run for this branch was made under Rosetta on an
+  Apple M1 (x86_64 binaries); both sides of every comparison were
+  translated identically.
 
 ## License
 
