@@ -1,0 +1,10 @@
+{"kernel": "fill32", "impl": "python", "best_ns": 29041003.3, "median_ns": 29526772.7, "checksum": 320255972868096}
+{"kernel": "span", "impl": "python", "best_ns": 2129507.1, "median_ns": 2145910.9, "checksum": 28299366513}
+{"kernel": "sumsq", "impl": "python", "best_ns": 57775403.0, "median_ns": 61475745.3, "checksum": 384307717958270976}
+{"kernel": "fib", "impl": "python", "best_ns": 413972449.0, "median_ns": 417895880.0, "checksum": 2178309}
+{"kernel": "histo", "impl": "python", "best_ns": 177903702.0, "median_ns": 179338431.0, "checksum": 538969024}
+{"kernel": "fnv1a", "impl": "python", "best_ns": 555988141.0, "median_ns": 569360608.0, "checksum": 3462303757254121957}
+{"kernel": "fill32", "impl": "numpy", "best_ns": 282656.3, "median_ns": 311324.9, "checksum": 320255972868096}
+{"kernel": "span", "impl": "numpy", "best_ns": 78591.5, "median_ns": 79740.2, "checksum": 28299366513}
+{"kernel": "sumsq", "impl": "numpy", "best_ns": 1129630.4, "median_ns": 1142016.6, "checksum": 384307717958270976}
+{"kernel": "histo", "impl": "numpy", "best_ns": 30577146.4, "median_ns": 34308195.9, "checksum": 538969024}

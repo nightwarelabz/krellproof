@@ -1,0 +1,14 @@
+fn fib(i64) -> i64 {
+  entry(n: i64):
+    %c = icmp.slt i64 n, 2
+    condbr %c, base(n), rec(n)
+  base(n: i64):
+    ret n
+  rec(n: i64):
+    %n1 = sub i64 n, 1
+    %a = call i64 fib(%n1)
+    %n2 = sub i64 n, 2
+    %b = call i64 fib(%n2)
+    %s = add i64 %a, %b
+    ret s
+}

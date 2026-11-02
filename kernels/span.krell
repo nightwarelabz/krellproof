@@ -1,0 +1,40 @@
+fn span(ptr, ptr, i64, i32, i32, i32, i32, i32) -> void {
+  entry(dst: ptr, tex: ptr, w: i64, u0: i32, v0: i32, du: i32, dv: i32, light: i32):
+    br loop(0, u0, v0, dst, tex, w, du, dv, light)
+  loop(x: i64, u: i32, v: i32, dst: ptr, tex: ptr, w: i64, du: i32, dv: i32, light: i32):
+    %c = icmp.slt i64 x, w
+    condbr %c, body(x, u, v, dst, tex, w, du, dv, light), done()
+  body(x: i64, u: i32, v: i32, dst: ptr, tex: ptr, w: i64, du: i32, dv: i32, light: i32):
+    %tx0 = ashr i32 u, 16
+    %tx = and i32 %tx0, 63
+    %ty0 = ashr i32 v, 16
+    %ty = and i32 %ty0, 63
+    %row = mul i32 %ty, 64
+    %idx32 = add i32 %row, %tx
+    %idx = sext i64 %idx32
+    %tp = gep i32 tex, %idx
+    %px = load i32, %tp
+    %r0 = lshr i32 %px, 16
+    %r1 = and i32 %r0, 255
+    %r2 = mul i32 %r1, light
+    %r = lshr i32 %r2, 8
+    %g0 = lshr i32 %px, 8
+    %g1 = and i32 %g0, 255
+    %g2 = mul i32 %g1, light
+    %g = lshr i32 %g2, 8
+    %b1 = and i32 %px, 255
+    %b2 = mul i32 %b1, light
+    %b = lshr i32 %b2, 8
+    %pk0 = shl i32 %r, 16
+    %pk1 = shl i32 %g, 8
+    %pk2 = add i32 %pk0, %pk1
+    %pk = add i32 %pk2, %b
+    %dp = gep i32 dst, x
+    store i32 %dp, %pk
+    %un = add i32 u, du
+    %vn = add i32 v, dv
+    %xn = add i64 x, 1
+    br loop(%xn, %un, %vn, dst, tex, w, du, dv, light)
+  done():
+    ret
+}

@@ -1,0 +1,37 @@
+extern malloc(i64) -> ptr
+fn main() -> i64 {
+  entry():
+    %tex = call ptr malloc(16384)
+    %dst = call ptr malloc(16384)
+    br tf(0, %tex, %dst)
+  tf(i: i64, tex: ptr, dst: ptr):
+    %c = icmp.slt i64 i, 4096
+    condbr %c, tfb(i, tex, dst), reps(0, tex, dst)
+  tfb(i: i64, tex: ptr, dst: ptr):
+    %i32 = trunc i32 i
+    %m = mul i32 %i32, -1640531535
+    %s = lshr i32 %m, 8
+    %p = gep i32 tex, i
+    store i32 %p, %s
+    %i2 = add i64 i, 1
+    br tf(%i2, tex, dst)
+  reps(r: i64, tex: ptr, dst: ptr):
+    %c = icmp.slt i64 r, 200
+    condbr %c, docall(r, tex, dst), sum(0, 0, dst)
+  docall(r: i64, tex: ptr, dst: ptr):
+    call void span(dst, tex, 4096, 196608, 327680, 70000, -30000, 200)
+    %r2 = add i64 r, 1
+    br reps(%r2, tex, dst)
+  sum(i: i64, s: i64, dst: ptr):
+    %c = icmp.slt i64 i, 4096
+    condbr %c, sumb(i, s, dst), fin(s)
+  sumb(i: i64, s: i64, dst: ptr):
+    %p = gep i32 dst, i
+    %v = load i32, %p
+    %ve = zext i64 %v
+    %s2 = add i64 s, %ve
+    %i2 = add i64 i, 1
+    br sum(%i2, %s2, dst)
+  fin(s: i64):
+    ret s
+}

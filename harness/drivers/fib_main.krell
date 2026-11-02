@@ -1,0 +1,13 @@
+fn main() -> i64 {
+  entry():
+    br reps(0, 0)
+  reps(r: i64, last: i64):
+    %c = icmp.slt i64 r, 1
+    condbr %c, docall(r), fin(last)
+  docall(r: i64):
+    %f = call i64 fib(32)
+    %r2 = add i64 r, 1
+    br reps(%r2, %f)
+  fin(s: i64):
+    ret s
+}

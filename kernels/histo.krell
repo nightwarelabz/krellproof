@@ -1,0 +1,19 @@
+fn histo(ptr, i64, ptr) -> void {
+  entry(buf: ptr, n: i64, hist: ptr):
+    br loop(0, buf, n, hist)
+  loop(i: i64, buf: ptr, n: i64, hist: ptr):
+    %c = icmp.slt i64 i, n
+    condbr %c, body(i, buf, n, hist), done()
+  body(i: i64, buf: ptr, n: i64, hist: ptr):
+    %p = gep i8 buf, i
+    %b = load i8, %p
+    %idx = zext i64 %b
+    %hp = gep i64 hist, %idx
+    %old = load i64, %hp
+    %new = add i64 %old, 1
+    store i64 %hp, %new
+    %i2 = add i64 i, 1
+    br loop(%i2, buf, n, hist)
+  done():
+    ret
+}

@@ -1,0 +1,17 @@
+fn fnv1a(ptr, i64) -> i64 {
+  entry(buf: ptr, n: i64):
+    br loop(0, -3750763034362895579, buf, n)
+  loop(i: i64, h: i64, buf: ptr, n: i64):
+    %c = icmp.slt i64 i, n
+    condbr %c, body(i, h, buf, n), done(h)
+  body(i: i64, h: i64, buf: ptr, n: i64):
+    %p = gep i8 buf, i
+    %b = load i8, %p
+    %bv = zext i64 %b
+    %x = xor i64 h, %bv
+    %h2 = mul i64 %x, 1099511628211
+    %i2 = add i64 i, 1
+    br loop(%i2, %h2, buf, n)
+  done(h: i64):
+    ret h
+}

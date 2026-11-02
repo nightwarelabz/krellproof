@@ -1,0 +1,6 @@
+{"kernel": "fill32", "impl": "krell_interp", "best_ns": 154075994.0, "median_ns": 154075994.0, "checksum": 320255972868096}
+{"kernel": "span", "impl": "krell_interp", "best_ns": 1786338.9, "median_ns": 1786338.9, "checksum": 28299366513}
+{"kernel": "sumsq", "impl": "krell_interp", "best_ns": 170560084.5, "median_ns": 170560084.5, "checksum": 384307717958270976}
+{"kernel": "fib", "impl": "krell_interp", "best_ns": 2881159008.5, "median_ns": 2881159008.5, "checksum": 2178309}
+{"kernel": "histo", "impl": "krell_interp", "best_ns": 734078103.3, "median_ns": 734078103.3, "checksum": 538969024}
+{"kernel": "fnv1a", "impl": "krell_interp", "best_ns": 672370656.7, "median_ns": 672370656.7, "checksum": 3462303757254121957}

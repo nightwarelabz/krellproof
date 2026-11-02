@@ -1,0 +1,14 @@
+fn fill32(ptr, i64, i32) -> void {
+  entry(dst: ptr, n: i64, val: i32):
+    br loop(0, dst, n, val)
+  loop(i: i64, dst: ptr, n: i64, val: i32):
+    %c = icmp.slt i64 i, n
+    condbr %c, body(i, dst, n, val), done()
+  body(i: i64, dst: ptr, n: i64, val: i32):
+    %p = gep i32 dst, i
+    store i32 %p, val
+    %n1 = add i64 i, 1
+    br loop(%n1, dst, n, val)
+  done():
+    ret
+}

@@ -1,0 +1,12 @@
+{"kernel":"fill32","impl":"c_o1","best_ns":558471.5,"median_ns":614051.3,"checksum":320255972868096}
+{"kernel":"fill32","impl":"krell","best_ns":1781824.1,"median_ns":1814044.0,"checksum":320255972868096}
+{"kernel":"span","impl":"c_o1","best_ns":13370.0,"median_ns":13476.3,"checksum":28299366513}
+{"kernel":"span","impl":"krell","best_ns":91493.8,"median_ns":92192.8,"checksum":28299366513}
+{"kernel":"sumsq","impl":"c_o1","best_ns":733147.2,"median_ns":811808.3,"checksum":384307717958270976}
+{"kernel":"sumsq","impl":"krell","best_ns":2827714.8,"median_ns":2921855.7,"checksum":384307717958270976}
+{"kernel":"fib","impl":"c_o1","best_ns":17340835.7,"median_ns":17534517.8,"checksum":2178309}
+{"kernel":"fib","impl":"krell","best_ns":20874970.9,"median_ns":21254396.5,"checksum":2178309}
+{"kernel":"histo","impl":"c_o1","best_ns":2267889.0,"median_ns":2279927.0,"checksum":538969024}
+{"kernel":"histo","impl":"krell","best_ns":11219488.2,"median_ns":11332642.0,"checksum":538969024}
+{"kernel":"fnv1a","impl":"c_o1","best_ns":8953728.6,"median_ns":9299990.4,"checksum":3462303757254121957}
+{"kernel":"fnv1a","impl":"krell","best_ns":10041820.0,"median_ns":10208834.8,"checksum":3462303757254121957}

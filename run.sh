@@ -1,0 +1,38 @@
+#!/bin/bash
+# KRELLPROOF full run: build, bench, validate, graph.
+# Requires: a built krellc (Krell v1.1 tree), cc, python3 with numpy + PIL.
+#   KRELLC=/path/to/krellc ./run.sh
+set -e
+cd "$(dirname "$0")"
+KRELLC="${KRELLC:-$HOME/workspace/rung-runfix/krellc}"
+export KRELL_TARGETS="${KRELL_TARGETS:-$(dirname "$KRELLC")/targets}"
+mkdir -p build results
+KERNELS="fill32 span sumsq fib histo fnv1a"
+
+for k in $KERNELS; do
+  "$KRELLC" parse kernels/$k.krell -o build/$k.krel
+  "$KRELLC" build build/$k.krel --target x86_64 -O -o build/$k.s
+  cc -O2 -c build/$k.s -o build/$k.o
+  cat kernels/$k.krell harness/drivers/${k}_main.krell > build/drv_$k.krell
+done
+
+for O in 0 1 2; do
+  cc -O$O -std=c11 -c kernels/refs.c -o build/refs_o$O.o
+  cc -O$O -std=c11 -DIMPL_NAME="\"c_o$O\"" -o build/bench_o$O \
+     harness/bench.c build/refs_o$O.o \
+     build/fill32.o build/span.o build/sumsq.o build/fib.o \
+     build/histo.o build/fnv1a.o -lm
+  ./build/bench_o$O > results/raw_c_o$O.jsonl
+done
+
+python3 harness/bench.py python
+python3 harness/bench.py interp
+python3 harness/bench.py merge
+
+python3 graph/gen_graph.py
+"$KRELLC" parse graph/graph.krell -o build/graph.krel
+"$KRELLC" build build/graph.krel --target x86_64 -O -o build/graph.s
+cc build/graph.s -lm -o build/graph
+./build/graph > build/graph.ppm
+python3 -c "from PIL import Image; Image.open('build/graph.ppm').save('graph/graph.png')"
+echo "done: results/results.json, graph/graph.png"
