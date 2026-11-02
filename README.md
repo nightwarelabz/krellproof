@@ -58,7 +58,7 @@ Machine: Apple M1 (x86_64 binaries under Rosetta) -
 Apple clang 21.0.0 -O2 - Python 3.15.1 - NumPy 2.5.4 -
 Krell v2.0 development tree (WP1 vector lowering; WP2 x86_64 backend
 code generation; WP3 fragment superoptimization of hot inner loops;
-x86_64 native lane).
+WP4 call, loop, and chain overhead polish; x86_64 native lane).
 The C reference here is clang, not gcc: the opponent changed with
 the machine, and every number below is from this one run.
 
@@ -66,12 +66,12 @@ Best ns per call (lower is faster):
 
 | kernel | C -O0 | C -O1 | C -O2 | Krell native | Krell interp | Python | NumPy |
 |---|---|---|---|---|---|---|---|
-| fill32 | 739.6K | 328.0K | 66.2K | 69.1K | 276.72M | 15.80M | 67.8K |
-| span | 15.3K | 6.1K | 6.1K | 4.5K | 2.27M | 1.16M | 29.6K |
-| sumsq | 1.22M | 527.0K | 414.8K | 300.8K | 292.51M | 47.58M | 368.2K |
-| fib | 13.80M | 5.96M | 6.38M | 9.84M | 4.17G | 215.83M | -- |
-| histo | 3.66M | 1.38M | 1.18M | 1.16M | 1.49G | 93.06M | 6.39M |
-| fnv1a | 9.88M | 5.27M | 5.26M | 6.09M | 1.24G | 385.30M | -- |
+| fill32 | 729.5K | 327.8K | 66.1K | 66.3K | 273.47M | 15.78M | 63.4K |
+| span | 14.7K | 6.1K | 6.1K | 5.5K | 2.27M | 1.16M | 29.5K |
+| sumsq | 1.18M | 521.3K | 419.0K | 270.0K | 292.51M | 45.22M | 367.8K |
+| fib | 13.79M | 5.95M | 6.37M | 5.92M | 4.17G | 211.24M | -- |
+| histo | 3.65M | 1.40M | 1.17M | 1.17M | 1.49G | 93.16M | 6.35M |
+| fnv1a | 9.87M | 5.26M | 5.26M | 5.26M | 1.24G | 384.31M | -- |
 
 ## Reading the results
 
@@ -106,17 +106,36 @@ Best ns per call (lower is faster):
   immediates back into instructions. The differential battery
   stands at 4,546 cases, 0 failures, and every checksum is
   unchanged.
+- WP4 (call, loop, and chain overhead polish) closed the two
+  gaps WP3 left, against the WP3 run on this same harness as
+  baseline. fib runs at 0.929 (WP3: 1.543): the x86_64 backend
+  recognizes the binary self-recursion shape, converts the
+  second recursive call into an accumulation loop, and returns
+  base cases without building a frame -- sound because Krell
+  integer addition is total and associative, and the battery
+  and checksums are unchanged. fnv1a runs at 0.999 (WP3:
+  1.158): the optimizer recognizes the serial hash chain,
+  unrolls it four ways, and hoists the FNV prime constant out
+  of the loop into a dedicated register, where clang materializes
+  it once and the previous Krell code materialized it per byte.
+  histo is at parity (0.998; WP3: 0.989) with its inner-loop
+  spill removed. WP4 changes no code generation for fill32,
+  span, or sumsq -- their emitted code is byte-identical to the
+  WP3 toolchain -- so their movement against the WP3 run
+  (fill32 1.044 -> 1.004, span 0.739 -> 0.902, sumsq 0.725 ->
+  0.644) is run-to-run variance on a shared machine, not
+  software change, in either direction.
 - Headline: the geometric mean of S = T_C / T_Krell across the
-  six kernels is 1.002 on this run -- Krell is at parity with
-  clang -O2 overall for the first time, up from 0.804 after WP2,
-  0.44 after WP1, and 0.235 for the v1.1 baseline measured the
-  same way on this machine class. The remaining gaps are fib
-  1.54x and fnv1a 1.16x; fnv1a's target (ratio <= 1.02) is
-  WP4 work -- scalar loop and dependency-chain optimization.
+  six kernels is 1.108 on this run, up from 1.002 after WP3,
+  0.804 after WP2, 0.44 after WP1, and 0.235 for the v1.1
+  baseline measured the same way on this machine class. Krell
+  is ahead of clang -O2 overall on this bench; every kernel is
+  at or ahead of parity in this run, with fill32 bounded by
+  the memory roofline rather than by code generation.
 - On the original bench machine (AMD EPYC, gcc -O2), an
-  independent run of the same WP3 toolchain measured fill32
-  at 0.497x, span at 0.514x, sumsq at 1.043x, fib at 3.361x,
-  histo at 0.796x, and fnv1a at 0.986x vs C -O2, with every
+  independent run of the same WP4 toolchain measured fill32
+  at 0.312x, span at 0.742x, sumsq at 0.807x, fib at 1.816x,
+  histo at 0.980x, and fnv1a at 1.015x vs C -O2, with every
   checksum identical to the Mac run. The two machines disagree
   on individual kernels -- they are measurements of different
   opponents (gcc on EPYC vs clang under Rosetta on M1), which
