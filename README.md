@@ -121,11 +121,18 @@ Best ns per call (lower is faster):
   on individual kernels -- they are measurements of different
   opponents (gcc on EPYC vs clang under Rosetta on M1), which
   is why the machine and compiler are stated with every table.
-- Known regression in this run: the chart's glyph text renders
-  fragmented under the WP3 toolchain (the bar geometry is
-  correct; the 5x7 glyph rows are partially dropped). The
-  published graph.png is the faithful WP3 render, left as-is
-  until the glyph path is repaired.
+- Chart rendering note: the first WP3 build rendered this
+  chart's glyph text fragmented. The cause was a register-pool
+  change in the x86_64 backend that admitted RCX and RDX as
+  allocatable registers when a function contained no division
+  or no variable shift -- but the emitter uses RCX for every
+  non-constant shift and RDX for memcpy/memset argument setup
+  regardless, so live values in those registers were clobbered
+  (the chart's data accessors were the first code to hit it;
+  all bench checksums were unaffected). The pool is restored
+  to the WP2 set in the current v2.0 tree, and this chart is
+  rendered by the fixed toolchain from the recorded results
+  above.
 
 The deterministic property no column can show: the Krell rows are
 produced by a total, verified IR whose outputs are byte-identical
