@@ -113,17 +113,14 @@ Best ns per call (lower is faster):
   same way on this machine class. The remaining gaps are fib
   1.54x and fnv1a 1.16x; fnv1a's target (ratio <= 1.02) is
   WP4 work -- scalar loop and dependency-chain optimization.
-- On the original bench machine (AMD EPYC, gcc -O2), the same
-  WP3 toolchain measured fill32 at 0.320x and sumsq at 0.573x
-  vs C -O2 -- ahead of C -- with span 3.92x, histo 2.88x, fib
-  2.60x, and fnv1a 1.04x, and every checksum identical to the
-  Mac run. The WP3 gains reproduce directionally there (span
-  5.33x -> 3.92x and histo 4.19x -> 2.88x against the WP2
-  toolchain on that machine) without reaching clang's numbers,
-  because gcc's baseline-target vectorization leaves headroom
-  that clang on this machine does not. Both statements are
-  true; they are measurements of different opponents, which is
-  why the machine and compiler are stated with every table.
+- On the original bench machine (AMD EPYC, gcc -O2), an
+  independent run of the same WP3 toolchain measured fill32
+  at 0.497x, span at 0.514x, sumsq at 1.043x, fib at 3.361x,
+  histo at 0.796x, and fnv1a at 0.986x vs C -O2, with every
+  checksum identical to the Mac run. The two machines disagree
+  on individual kernels -- they are measurements of different
+  opponents (gcc on EPYC vs clang under Rosetta on M1), which
+  is why the machine and compiler are stated with every table.
 - Known regression in this run: the chart's glyph text renders
   fragmented under the WP3 toolchain (the bar geometry is
   correct; the 5x7 glyph rows are partially dropped). The
