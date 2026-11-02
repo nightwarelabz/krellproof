@@ -57,7 +57,8 @@ so both sides of each comparison share buffers, protocol, and clock.
 Machine: Apple M1 (x86_64 binaries under Rosetta) -
 Apple clang 21.0.0 -O2 - Python 3.15.1 - NumPy 2.5.4 -
 Krell v2.0 development tree (WP1 vector lowering; WP2 x86_64 backend
-code generation; x86_64 native lane).
+code generation; WP3 fragment superoptimization of hot inner loops;
+x86_64 native lane).
 The C reference here is clang, not gcc: the opponent changed with
 the machine, and every number below is from this one run.
 
@@ -65,48 +66,69 @@ Best ns per call (lower is faster):
 
 | kernel | C -O0 | C -O1 | C -O2 | Krell native | Krell interp | Python | NumPy |
 |---|---|---|---|---|---|---|---|
-| fill32 | 706.2K | 328.1K | 66.2K | 66.5K | 278.28M | 15.81M | 65.4K |
-| span | 14.7K | 6.1K | 6.1K | 10.6K | 2.17M | 1.16M | 29.6K |
-| sumsq | 1.18M | 525.3K | 415.9K | 421.9K | 289.83M | 45.67M | 367.8K |
-| fib | 13.79M | 5.95M | 6.37M | 9.42M | 4.14G | 212.06M | -- |
-| histo | 3.65M | 1.38M | 1.19M | 1.48M | 1.42G | 93.64M | 6.84M |
-| fnv1a | 9.86M | 5.26M | 5.26M | 5.92M | 1.28G | 369.10M | -- |
+| fill32 | 739.6K | 328.0K | 66.2K | 69.1K | 276.72M | 15.80M | 67.8K |
+| span | 15.3K | 6.1K | 6.1K | 4.5K | 2.27M | 1.16M | 29.6K |
+| sumsq | 1.22M | 527.0K | 414.8K | 300.8K | 292.51M | 47.58M | 368.2K |
+| fib | 13.80M | 5.96M | 6.38M | 9.84M | 4.17G | 215.83M | -- |
+| histo | 3.66M | 1.38M | 1.18M | 1.16M | 1.49G | 93.06M | 6.39M |
+| fnv1a | 9.88M | 5.27M | 5.26M | 6.09M | 1.24G | 385.30M | -- |
 
 ## Reading the results
 
-- fill32 is at parity with clang -O2 (ratio 1.005 in this harness
-  run). Both implementations move 4 MiB at ~64 GB/s -- the
-  memory-bandwidth roofline of the machine. There is no headroom
-  left in this domain for either side. Krell v1.1 measured 24.3x
-  behind C on this kernel and machine class; the gain came from
-  vector lowering in the optimizer (WP1), not from kernel
-  changes -- the kernels are byte-identical to the v1 run.
-- sumsq is at parity (1.014). Krell now emits the same instruction
-  sequence clang does for the i64 reduction; beating it requires
-  a different sequence, which is superoptimizer work (WP3), not
-  tuning.
-- WP2 (x86_64 backend code generation: condition-code fusion,
-  two-address register affinity, addressing-mode folding) closed
-  most of the remaining gaps. Against the v1.1 baseline on this
-  machine, span is 5.71x faster (now 1.75x behind C, was 9.64x),
-  histo 4.77x faster (1.25x behind, was 4.21x), and fib 1.66x
-  faster (1.48x behind, was 2.23x). fnv1a also improved to 1.12x
-  behind C (was 1.51x). No kernel regressed, and every checksum
-  is unchanged.
+- fill32 remains in the memory-roofline band (ratio 1.044 in
+  this harness run). Both implementations move 4 MiB at ~64 GB/s
+  -- the memory-bandwidth roofline of the machine. There is no
+  headroom left in this domain for either side. Krell v1.1
+  measured 24.3x behind C on this kernel and machine class; the
+  gain came from vector lowering in the optimizer (WP1), not
+  from kernel changes -- the kernels are byte-identical to the
+  v1 run.
+- WP3 (fragment superoptimization of the hot inner loops) put
+  three kernels ahead of clang -O2. span runs at ratio 0.739
+  (S = 1.353x): a proved value-preserving rewrite of the 24-bit
+  per-pixel RGB lighting pipeline -- one 16-bit packed multiply
+  replacing three scalar multiplies -- lowered to a zero-spill
+  SSE2 sequence, 9.55x faster than the v1.1 baseline Krell time.
+  sumsq runs at 0.725 (S = 1.379x): the scalar reduction is
+  replaced by four independent accumulator streams with a
+  balanced pairwise tree reduction at loop exit, 5.27x over
+  baseline -- the beat-C attempt transferred here from WP1 is
+  closed. histo runs at 0.989 (S = 1.011x): 4-way unrolling
+  with all four byte loads issued before any increment
+  (memory-level parallelism), plus zero-extension/truncation
+  register coalescing that removes the intermediate moves,
+  4.66x over baseline.
+- WP3 also carried a register-allocation and ABI correctness
+  overhaul: dead intervals (defpos == endpos == 0) no longer
+  evict live arguments, moves into unallocated slots can no
+  longer overwrite the saved frame pointer at [rbp - 0], and
+  constant rematerialization (func_rebuild_constants) folds
+  immediates back into instructions. The differential battery
+  stands at 4,546 cases, 0 failures, and every checksum is
+  unchanged.
 - Headline: the geometric mean of S = T_C / T_Krell across the
-  six kernels is 0.804 on this run (80.4% of C speed overall),
-  up from 0.44 after WP1 and 0.235 for the v1.1 baseline measured
-  the same way on this machine class. Krell does not yet beat C
-  on this machine: the remaining gaps are span 1.75x, fib 1.48x,
-  histo 1.25x, and fnv1a 1.12x.
+  six kernels is 1.002 on this run -- Krell is at parity with
+  clang -O2 overall for the first time, up from 0.804 after WP2,
+  0.44 after WP1, and 0.235 for the v1.1 baseline measured the
+  same way on this machine class. The remaining gaps are fib
+  1.54x and fnv1a 1.16x; fnv1a's target (ratio <= 1.02) is
+  WP4 work -- scalar loop and dependency-chain optimization.
 - On the original bench machine (AMD EPYC, gcc -O2), the same
-  WP2 toolchain measured fill32 at 0.318x and sumsq at 0.572x
-  vs C -O2 -- ahead of C -- with span 5.33x, histo 4.19x, fib
-  2.60x, and fnv1a 1.04x, because gcc's baseline-target
-  vectorization leaves headroom that clang on this machine does
-  not. Both statements are true; they are measurements of
-  different opponents, which is why the machine and compiler are
-  stated with every table.
+  WP3 toolchain measured fill32 at 0.320x and sumsq at 0.573x
+  vs C -O2 -- ahead of C -- with span 3.92x, histo 2.88x, fib
+  2.60x, and fnv1a 1.04x, and every checksum identical to the
+  Mac run. The WP3 gains reproduce directionally there (span
+  5.33x -> 3.92x and histo 4.19x -> 2.88x against the WP2
+  toolchain on that machine) without reaching clang's numbers,
+  because gcc's baseline-target vectorization leaves headroom
+  that clang on this machine does not. Both statements are
+  true; they are measurements of different opponents, which is
+  why the machine and compiler are stated with every table.
+- Known regression in this run: the chart's glyph text renders
+  fragmented under the WP3 toolchain (the bar geometry is
+  correct; the 5x7 glyph rows are partially dropped). The
+  published graph.png is the faithful WP3 render, left as-is
+  until the glyph path is repaired.
 
 The deterministic property no column can show: the Krell rows are
 produced by a total, verified IR whose outputs are byte-identical

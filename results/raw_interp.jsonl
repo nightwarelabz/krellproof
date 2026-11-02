@@ -1,6 +1,6 @@
-{"kernel": "fill32", "impl": "krell_interp", "best_ns": 278281041.5, "median_ns": 278281041.5, "checksum": 320255972868096}
-{"kernel": "span", "impl": "krell_interp", "best_ns": 2174226.7, "median_ns": 2174226.7, "checksum": 28299366513}
-{"kernel": "sumsq", "impl": "krell_interp", "best_ns": 289830698.0, "median_ns": 289830698.0, "checksum": 384307717958270976}
-{"kernel": "fib", "impl": "krell_interp", "best_ns": 4140253479.0, "median_ns": 4140253479.0, "checksum": 2178309}
-{"kernel": "histo", "impl": "krell_interp", "best_ns": 1416286472.4, "median_ns": 1416286472.4, "checksum": 538969024}
-{"kernel": "fnv1a", "impl": "krell_interp", "best_ns": 1276445625.0, "median_ns": 1276445625.0, "checksum": 3462303757254121957}
+{"kernel": "fill32", "impl": "krell_interp", "best_ns": 276718614.5, "median_ns": 276718614.5, "checksum": 320255972868096}
+{"kernel": "span", "impl": "krell_interp", "best_ns": 2269941.7, "median_ns": 2269941.7, "checksum": 28299366513}
+{"kernel": "sumsq", "impl": "krell_interp", "best_ns": 292511948.0, "median_ns": 292511948.0, "checksum": 384307717958270976}
+{"kernel": "fib", "impl": "krell_interp", "best_ns": 4166788375.0, "median_ns": 4166788375.0, "checksum": 2178309}
+{"kernel": "histo", "impl": "krell_interp", "best_ns": 1488365708.7, "median_ns": 1488365708.7, "checksum": 538969024}
+{"kernel": "fnv1a", "impl": "krell_interp", "best_ns": 1240702083.1, "median_ns": 1240702083.1, "checksum": 3462303757254121957}
