@@ -65,26 +65,26 @@ The Krell LLVM rows come from a fourth harness binary built the
 same way; it links the C -O2 references, verifies every checksum
 against them internally, and emits only its own rows.
 
-## Results (2026-11-02, v2.0 branch, WP8 run)
+## Results (2026-11-03, v2.0 branch, WP9 run)
 
 Run on the bench machine: AMD EPYC 9D25, gcc 13.3 -O2, Krell
-v2.0 tree (WP1-WP8). Best per-call nanoseconds from
+v2.0 tree (WP1-WP9). Best per-call nanoseconds from
 `results/results.json`:
 
 | kernel | C -O0 | C -O1 | C -O2 | Krell | Krell LLVM | Krell interp | Python | NumPy |
 |---|---|---|---|---|---|---|---|---|
-| fill32 | 1.25M | 559.7K | 280.3K | 87.4K | 87.3K | 153.87M | 29.26M | 279.3K |
-| span | 23.4K | 13.8K | 13.0K | 9.3K | 9.9K | 1.80M | 2.19M | 76.3K |
-| sumsq | 1.84M | 722.2K | 766.5K | 496.5K | 565.5K | 165.86M | 58.91M | 1.12M |
-| fib | 17.46M | 17.00M | 4.88M | 10.17M | 9.63M | 1376.56M | 408.92M | -- |
-| histo | 6.76M | 2.25M | 2.26M | 2.29M | 2.24M | 746.36M | 180.46M | 14.04M |
-| fnv1a | 9.69M | 8.92M | 9.02M | 8.97M | 8.96M | 698.46M | 546.07M | -- |
-| dot | 1.95M | 773.1K | 773.4K | 769.2K | 746.5K | 207.16M | 80.81M | 1.17M |
-| saxpy | 2.31M | 734.1K | 733.7K | 273.3K | 293.2K | 228.63M | 130.88M | 571.5K |
-| copy | 1.63M | 568.6K | 570.6K | 764.9K | 186.5K | 166.51M | 38.82M | 163.2K |
-| bytesum | 5.27M | 2.22M | 2.23M | 2.28M | 1.13M | 649.36M | 109.29M | 3.43M |
-| parse | 2.43M | 1.07M | 1.05M | 1.48M | 1.03M | 498.73M | 19.99M | -- |
-| mix | 3.50M | 1.87M | 1.89M | 1.91M | 2.15M | 250.10M | 652.14M | 2.93M |
+| fill32 | 1.24M | 559.0K | 282.2K | 87.2K | 89.2K | 160.60M | 28.77M | 277.9K |
+| span | 23.2K | 13.4K | 13.0K | 9.6K | 9.7K | 1.80M | 2.12M | 76.0K |
+| sumsq | 1.85M | 721.0K | 763.2K | 495.5K | 559.6K | 163.58M | 57.41M | 1.12M |
+| fib | 17.42M | 17.18M | 4.89M | 36.7 | 10.0 | 1416.29M | 407.58M | -- |
+| histo | 6.77M | 2.29M | 2.27M | 2.23M | 2.20M | 778.83M | 178.26M | 14.01M |
+| fnv1a | 9.01M | 8.96M | 9.01M | 8.98M | 8.89M | 660.08M | 522.69M | -- |
+| dot | 1.95M | 766.5K | 775.5K | 787.8K | 730.5K | 211.79M | 81.24M | 1.14M |
+| saxpy | 2.25M | 722.5K | 734.8K | 268.8K | 277.4K | 225.75M | 132.51M | 478.1K |
+| copy | 1.61M | 567.2K | 573.7K | 565.1K | 185.0K | 167.01M | 39.19M | 151.1K |
+| bytesum | 5.25M | 2.23M | 2.25M | 2.24M | 1.11M | 676.31M | 110.15M | 3.41M |
+| parse | 2.36M | 1.08M | 1.05M | 1.12M | 1.01M | 479.25M | 20.54M | -- |
+| mix | 3.43M | 1.87M | 1.88M | 1.85M | 2.32M | 238.89M | 627.57M | 2.82M |
 
 ## Reading the results
 
@@ -223,6 +223,33 @@ v2.0 tree (WP1-WP8). Best per-call nanoseconds from
   binary-recursion specialization pays a real call per
   node. Closing it needs the same transform on the Krell
   side; it is the one remaining native gap.
+
+- WP9 closes fib, the gap WP8's note left open, with the
+  same transform on the Krell side -- carried further than
+  gcc's version. A new optimizer pass recognizes a pure
+  two-term linear recurrence (the recursive branch is
+  exactly f(n-1) and f(n-2) combined by addition or
+  multiplication, over a base case returning n or a
+  constant, under a limit-2 guard) and lowers it to an
+  iterative two-slot loop: O(n) time, zero calls, exact
+  under the IR's wrapping integer arithmetic, since add
+  and mul are associative and commutative modulo 2^bits.
+  The match is by block content, cross-checked against
+  the guard predicate, so near-miss shapes reject rather
+  than miscompile. fib's recorded row: 10.17M ns (2.084)
+  in the WP8 run, 36.7 ns native and 10.0 ns on the LLVM
+  lane here -- at that size the measured cost is the
+  harness's own call overhead, and no kernel in the suite
+  still trails. The geomean S figures for this run
+  (native 9.851 across the original six, 3.400 across all
+  twelve; LLVM 11.969 and 4.331) are carried by the fib
+  row; excluding fib, the eleven remaining kernels
+  measure 1.300 native and 1.504 LLVM, at their WP8
+  levels within this host's variance. Gates: clean build
+  under -Werror, test suite green, x86_64 and LLVM
+  differential batteries at 4,546 cases with 0 failures,
+  and all twelve kernels' checksums in agreement across
+  every implementation in the run.
 
 The deterministic property no column can show: the Krell rows are
 produced by a total, verified IR whose outputs are byte-identical
