@@ -65,10 +65,10 @@ The Krell LLVM rows come from a fourth harness binary built the
 same way; it links the C -O2 references, verifies every checksum
 against them internally, and emits only its own rows.
 
-## Results (2026-11-03, v2.0 branch, WP13 run)
+## Results (2026-11-03, v2.0 branch, WP14 run)
 
 Run on the bench machine: AMD EPYC 9D25, gcc 13.3 -O2, Krell
-v2.0 tree (WP1-WP13). The LLVM lane of this run was built
+v2.0 tree (WP1-WP14). The LLVM lane of this run was built
 with clang 18 (the emscripten-bundled clang 19 used for the
 WP8-WP11 records was lost with its VM image); the lane's
 differential battery passes 4,546/0 under it. Best per-call
@@ -76,18 +76,18 @@ nanoseconds from `results/results.json`:
 
 | kernel | C -O0 | C -O1 | C -O2 | Krell | Krell LLVM | Krell interp | Python | NumPy |
 |---|---|---|---|---|---|---|---|---|
-| fill32 | 1.24M | 565.4K | 279.2K | 87.3K | 89.7K | 156.53M | 28.88M | 280.1K |
-| span | 23.1K | 13.6K | 12.8K | 9.2K | 9.8K | 1.82M | 2.10M | 79.2K |
-| sumsq | 1.83M | 742.1K | 768.8K | 494.5K | 564.0K | 173.10M | 56.94M | 1.13M |
-| fib | 17.26M | 16.82M | 4.90M | 25.3 | 10.0 | 1364.82M | 421.17M | -- |
-| histo | 6.72M | 2.31M | 2.26M | 2.24M | 2.21M | 774.74M | 177.00M | 14.59M |
-| fnv1a | 8.98M | 8.99M | 8.87M | 8.92M | 8.88M | 684.99M | 517.78M | -- |
-| dot | 1.91M | 762.7K | 805.8K | 766.9K | 739.4K | 200.64M | 85.68M | 1.17M |
-| saxpy | 2.24M | 729.9K | 729.4K | 269.3K | 292.3K | 213.90M | 132.61M | 465.4K |
-| copy | 1.64M | 569.4K | 569.3K | 187.8K | 184.9K | 180.35M | 39.83M | 179.4K |
-| bytesum | 5.29M | 2.23M | 2.23M | 843.8K | 598.2K | 657.36M | 109.02M | 3.43M |
-| parse | 2.37M | 1.09M | 1.09M | 1.09M | 1.02M | 543.08M | 19.93M | -- |
-| mix | 3.57M | 1.90M | 1.87M | 1.89M | 2.14M | 233.96M | 606.75M | 3.13M |
+| fill32 | 1.24M | 555.8K | 279.5K | 89.0K | 88.9K | 148.59M | 29.86M | 281.6K |
+| span | 25.1K | 13.4K | 12.9K | 8.9K | 9.8K | 1.81M | 2.27M | 77.7K |
+| sumsq | 1.89M | 723.1K | 768.4K | 403.0K | 569.6K | 165.28M | 59.46M | 1.13M |
+| fib | 17.23M | 17.14M | 4.89M | 24.7 | 10.0 | 1342.04M | 420.11M | -- |
+| histo | 6.75M | 2.29M | 2.26M | 2.23M | 2.21M | 717.34M | 180.19M | 14.42M |
+| fnv1a | 9.01M | 9.21M | 8.97M | 8.94M | 8.94M | 678.06M | 522.85M | -- |
+| dot | 1.92M | 804.6K | 779.9K | 770.9K | 741.8K | 198.52M | 85.89M | 1.14M |
+| saxpy | 2.25M | 726.5K | 738.4K | 191.5K | 290.4K | 225.22M | 141.84M | 500.4K |
+| copy | 1.61M | 569.5K | 571.2K | 187.1K | 187.5K | 174.84M | 39.39M | 148.8K |
+| bytesum | 5.25M | 2.25M | 2.25M | 642.4K | 605.1K | 644.02M | 112.78M | 3.44M |
+| parse | 2.36M | 1.08M | 1.06M | 967.2K | 1.03M | 478.74M | 20.10M | -- |
+| mix | 3.45M | 1.88M | 1.86M | 1.93M | 2.15M | 224.05M | 615.64M | 2.76M |
 
 ## Reading the results
 
@@ -377,6 +377,48 @@ nanoseconds from `results/results.json`:
   -Werror, test suite green, x86_64 and LLVM
   differential batteries at 4,546 cases with 0 failures,
   AArch64 and RISC-V code generation verified, and all
+  twelve kernels' checksums in agreement across every
+  implementation in the run.
+
+- WP14 works on the native register allocator and one
+  missed optimizer shape (kernels untouched). The
+  allocator's linear scan now chooses spill victims by
+  Belady's rule -- evict the interval whose next use is
+  farthest -- with next uses taken from a per-value use
+  census recorded on the same position grid as the
+  interval bounds (the census previously recorded each
+  use one position early, which made an operand of the
+  very instruction being allocated for look already
+  spent and therefore evictable) and, for a value live
+  across a loop back edge, wrapped to the first use of
+  the next iteration. In the optimizer, a general
+  integer map class joins the vectorizer: one indexed
+  load, a pure integer chain over the loaded value, one
+  indexed store -- the saxpy shape generalized past
+  multiply-add -- with a new vector logical-shift-right
+  op (vlshr) carried by all four backends for the
+  chains that need it. Chains containing a 64-bit
+  multiply are gated out: the native lane's decomposed
+  i64 vector multiply costs more than the scalar chain,
+  so mix's emitted code is byte-identical to WP13's.
+  Native rows move: saxpy 0.369 to 0.259, bytesum 0.378
+  to 0.285, sumsq 0.643 to 0.524, parse 0.997 to 0.911.
+  An interleaved A/B against the WP13 compiler (five
+  rounds, medians of per-round bests) measures saxpy
+  -28.7%, bytesum -23.6%, sumsq -18.2%, span -12.4%,
+  parse -0.3%; this run's dot (0.988) and mix (1.038)
+  native rows and mix's LLVM row (1.159) are host
+  weather on byte-identical code -- the A/B reads dot
+  -3.9% and mix -0.9%, and mix's LLVM IR is unchanged.
+  The LLVM lane is otherwise flat (1.590 to 1.580
+  excluding fib): WP14's work is native-side. Geomean
+  S against C -O2: native 10.973 across the original
+  six, 4.542 across all twelve (1.720 excluding fib);
+  LLVM 11.856 and 4.532 (1.580 excluding fib). Gates:
+  clean build under -Werror, test suite green, x86_64
+  and LLVM differential batteries at 4,546 cases with
+  0 failures, AArch64 and RISC-V code generation
+  verified, fuzz parity with WP13 unchanged, and all
   twelve kernels' checksums in agreement across every
   implementation in the run.
 
