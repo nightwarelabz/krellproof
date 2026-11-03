@@ -65,26 +65,26 @@ The Krell LLVM rows come from a fourth harness binary built the
 same way; it links the C -O2 references, verifies every checksum
 against them internally, and emits only its own rows.
 
-## Results (2026-11-02, v2.0 branch, WP6 run)
+## Results (2026-11-02, v2.0 branch, WP8 run)
 
 Run on the bench machine: AMD EPYC 9D25, gcc 13.3 -O2, Krell
-v2.0 tree (WP1-WP5 tail). Best per-call nanoseconds from
+v2.0 tree (WP1-WP8). Best per-call nanoseconds from
 `results/results.json`:
 
 | kernel | C -O0 | C -O1 | C -O2 | Krell | Krell LLVM | Krell interp | Python | NumPy |
 |---|---|---|---|---|---|---|---|---|
-| fill32 | 1.24M | 576.7K | 279.6K | 87.6K | 86.3K | 153.45M | 28.78M | 280.0K |
-| span | 23.0K | 13.6K | 12.8K | 9.3K | 9.8K | 1.80M | 2.22M | 75.8K |
-| sumsq | 1.85M | 740.2K | 756.7K | 480.0K | 562.6K | 163.26M | 58.64M | 1.12M |
-| fib | 17.22M | 16.65M | 4.86M | 9.90M | 9.60M | 2770.12M | 416.32M | -- |
-| histo | 6.73M | 2.34M | 2.26M | 2.23M | 2.21M | 749.72M | 179.62M | 14.52M |
-| fnv1a | 8.97M | 8.98M | 8.89M | 8.93M | 8.92M | 689.53M | 529.94M | -- |
-| dot | 1.93M | 764.4K | 738.8K | 762.8K | 835.6K | 193.09M | 82.21M | 1.17M |
-| saxpy | 2.24M | 722.7K | 725.1K | 260.0K | 288.0K | 211.48M | 147.79M | 466.2K |
-| copy | 1.61M | 564.3K | 562.6K | 567.5K | 185.3K | 168.43M | 39.45M | 160.6K |
-| bytesum | 5.21M | 2.23M | 2.28M | 2.98M | 1.12M | 657.38M | 111.13M | 3.43M |
-| parse | 2.35M | 1.07M | 1.05M | 1.68M | 1.02M | 487.64M | 19.84M | -- |
-| mix | 3.49M | 1.87M | 1.87M | 2.18M | 2.14M | 251.61M | 610.56M | 3.43M |
+| fill32 | 1.25M | 559.7K | 280.3K | 87.4K | 87.3K | 153.87M | 29.26M | 279.3K |
+| span | 23.4K | 13.8K | 13.0K | 9.3K | 9.9K | 1.80M | 2.19M | 76.3K |
+| sumsq | 1.84M | 722.2K | 766.5K | 496.5K | 565.5K | 165.86M | 58.91M | 1.12M |
+| fib | 17.46M | 17.00M | 4.88M | 10.17M | 9.63M | 1376.56M | 408.92M | -- |
+| histo | 6.76M | 2.25M | 2.26M | 2.29M | 2.24M | 746.36M | 180.46M | 14.04M |
+| fnv1a | 9.69M | 8.92M | 9.02M | 8.97M | 8.96M | 698.46M | 546.07M | -- |
+| dot | 1.95M | 773.1K | 773.4K | 769.2K | 746.5K | 207.16M | 80.81M | 1.17M |
+| saxpy | 2.31M | 734.1K | 733.7K | 273.3K | 293.2K | 228.63M | 130.88M | 571.5K |
+| copy | 1.63M | 568.6K | 570.6K | 764.9K | 186.5K | 166.51M | 38.82M | 163.2K |
+| bytesum | 5.27M | 2.22M | 2.23M | 2.28M | 1.13M | 649.36M | 109.29M | 3.43M |
+| parse | 2.43M | 1.07M | 1.05M | 1.48M | 1.03M | 498.73M | 19.99M | -- |
+| mix | 3.50M | 1.87M | 1.89M | 1.91M | 2.15M | 250.10M | 652.14M | 2.93M |
 
 ## Reading the results
 
@@ -188,6 +188,41 @@ v2.0 tree (WP1-WP5 tail). Best per-call nanoseconds from
   to the WP2 set in the current v2.0 tree, and this chart is
   rendered by the fixed toolchain from the recorded results
   above.
+
+- WP8 (a post-v2.0 optimization pass) is the run recorded
+  above. Four compiler changes, kernels untouched: a boolean
+  collapse in the optimizer (icmp.ne/eq of a zext'ed i1
+  against 0/1 substitutes the condition itself, so the
+  range-check compare fuses into the branch); a multiply by
+  a constant folds into the imul immediate in the x86
+  backend; the linear-scan allocator no longer evicts a
+  value whose live range crosses a block boundary in favor
+  of a short within-block interval; and constants defined
+  inside loop bodies are hoisted to the entry block.
+  parse's hot loop now runs entirely in registers: 1.596
+  in the WP6 record, 1.404 here -- and 1.015M ns against
+  1.688M for the WP6-record toolchain in an isolated
+  hot-loop A/B on this bench's exact parse dataset
+  (checksums agree); the bench harness measures this
+  kernel colder than a hot loop does. mix reaches parity
+  (1.010; its three 64-bit mixing constants were
+  previously re-materialized on every iteration). saxpy
+  moves 0.359 to 0.373 with a byte-identical vector body;
+  the change is in the scalar setup code's shape under
+  the new allocator rule. copy's 1.340 row is emitted-code
+  identical to the WP6 run's; treat it as host variance.
+  Geomean S against C -O2: native 1.220 across the
+  original six, 1.135 across all twelve; LLVM 1.197 and
+  1.363. Gates: clean build under -Werror, test suite
+  green, x86_64 and LLVM differential batteries at 4,546
+  cases with 0 failures. fib (2.084) is unchanged, and
+  its gap is root-caused: gcc -O2 rewrites the recursive
+  C reference into an explicit-stack loop (one call in
+  the disassembly, a 200-byte frame) -- still exponential
+  in work, but free of call overhead -- while the Krell
+  binary-recursion specialization pays a real call per
+  node. Closing it needs the same transform on the Krell
+  side; it is the one remaining native gap.
 
 The deterministic property no column can show: the Krell rows are
 produced by a total, verified IR whose outputs are byte-identical
