@@ -7,7 +7,7 @@ cd "$(dirname "$0")"
 KRELLC="${KRELLC:-$HOME/workspace/rung-runfix/krellc}"
 export KRELL_TARGETS="${KRELL_TARGETS:-$(dirname "$KRELLC")/targets}"
 mkdir -p build results
-KERNELS="fill32 span sumsq fib histo fnv1a"
+KERNELS="fill32 span sumsq fib histo fnv1a dot saxpy copy bytesum parse mix"
 
 for k in $KERNELS; do
   "$KRELLC" parse kernels/$k.krell -o build/$k.krel
@@ -21,7 +21,8 @@ for O in 0 1 2; do
   cc -O$O -std=c11 -DIMPL_NAME="\"c_o$O\"" -o build/bench_o$O \
      harness/bench.c build/refs_o$O.o \
      build/fill32.o build/span.o build/sumsq.o build/fib.o \
-     build/histo.o build/fnv1a.o -lm
+     build/histo.o build/fnv1a.o build/dot.o build/saxpy.o \
+     build/copy.o build/bytesum.o build/parse.o build/mix.o -lm
   ./build/bench_o$O > results/raw_c_o$O.jsonl
 done
 

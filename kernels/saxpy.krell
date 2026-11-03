@@ -1,0 +1,19 @@
+fn saxpy(ptr, ptr, i64, i32) {
+  entry(y: ptr, x: ptr, n: i64, a: i32):
+    br loop(0, y, x, n, a)
+  loop(i: i64, y: ptr, x: ptr, n: i64, a: i32):
+    %c = icmp.slt i64 i, n
+    condbr %c, body(i, y, x, n, a), done()
+  body(i: i64, y: ptr, x: ptr, n: i64, a: i32):
+    %px = gep i32 x, i
+    %vx = load i32, %px
+    %py = gep i32 y, i
+    %vy = load i32, %py
+    %m = mul i32 a, %vx
+    %r = add i32 %m, %vy
+    store i32 %py, %r
+    %i2 = add i64 i, 1
+    br loop(%i2, y, x, n, a)
+  done():
+    ret
+}

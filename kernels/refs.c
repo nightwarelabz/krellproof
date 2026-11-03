@@ -41,3 +41,44 @@ uint64_t ref_fnv1a(const uint8_t *buf, int64_t n) {
     for (int64_t i = 0; i < n; i++) { h ^= buf[i]; h *= 1099511628211ULL; }
     return h;
 }
+
+int64_t ref_dot(const int64_t *a, const int64_t *b, int64_t n) {
+    int64_t s = 0;
+    for (int64_t i = 0; i < n; i++) s += a[i] * b[i];
+    return s;
+}
+
+void ref_saxpy(int32_t *y, const int32_t *x, int64_t n, int32_t a) {
+    for (int64_t i = 0; i < n; i++) y[i] = a * x[i] + y[i];
+}
+
+void ref_copy(uint32_t *dst, const uint32_t *src, int64_t n) {
+    for (int64_t i = 0; i < n; i++) dst[i] = src[i];
+}
+
+uint64_t ref_bytesum(const uint8_t *buf, int64_t n) {
+    uint64_t s = 0;
+    for (int64_t i = 0; i < n; i++) s += buf[i];
+    return s;
+}
+
+int64_t ref_parse(const uint8_t *buf, int64_t n) {
+    int64_t s = 0, cur = 0;
+    int inn = 0;
+    for (int64_t i = 0; i < n; i++) {
+        uint8_t c = buf[i];
+        if (c >= '0' && c <= '9') { cur = cur * 10 + (c - '0'); inn = 1; }
+        else if (inn) { s += cur; cur = 0; inn = 0; }
+    }
+    if (inn) s += cur;
+    return s;
+}
+
+void ref_mix(uint64_t *dst, const uint64_t *src, int64_t n) {
+    for (int64_t i = 0; i < n; i++) {
+        uint64_t z = src[i] + 0x9E3779B97F4A7C15ULL;
+        z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
+        z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
+        dst[i] = z ^ (z >> 31);
+    }
+}

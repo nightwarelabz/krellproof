@@ -1,0 +1,18 @@
+fn dot(ptr, ptr, i64) -> i64 {
+  entry(a: ptr, b: ptr, n: i64):
+    br loop(0, 0, a, b, n)
+  loop(i: i64, s: i64, a: ptr, b: ptr, n: i64):
+    %c = icmp.slt i64 i, n
+    condbr %c, body(i, s, a, b, n), done(s)
+  body(i: i64, s: i64, a: ptr, b: ptr, n: i64):
+    %pa = gep i64 a, i
+    %va = load i64, %pa
+    %pb = gep i64 b, i
+    %vb = load i64, %pb
+    %p = mul i64 %va, %vb
+    %s2 = add i64 s, %p
+    %i2 = add i64 i, 1
+    br loop(%i2, %s2, a, b, n)
+  done(s: i64):
+    ret s
+}

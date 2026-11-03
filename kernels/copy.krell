@@ -1,0 +1,16 @@
+fn copy(ptr, ptr, i64) {
+  entry(d: ptr, s: ptr, n: i64):
+    br loop(0, d, s, n)
+  loop(i: i64, d: ptr, s: ptr, n: i64):
+    %c = icmp.slt i64 i, n
+    condbr %c, body(i, d, s, n), done()
+  body(i: i64, d: ptr, s: ptr, n: i64):
+    %ps = gep i32 s, i
+    %v = load i32, %ps
+    %pd = gep i32 d, i
+    store i32 %pd, %v
+    %i2 = add i64 i, 1
+    br loop(%i2, d, s, n)
+  done():
+    ret
+}

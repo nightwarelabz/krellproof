@@ -1,0 +1,41 @@
+extern malloc(i64) -> ptr
+fn main() -> i64 {
+  entry():
+    %x = call ptr malloc(4194304)
+    %y = call ptr malloc(4194304)
+    br af(0, %x, %y)
+  af(i: i64, x: ptr, y: ptr):
+    %c = icmp.slt i64 i, 1048576
+    condbr %c, afb(i, x, y), reps(0, x, y)
+  afb(i: i64, x: ptr, y: ptr):
+    %px = gep i32 x, i
+    %vx64 = add i64 i, 1
+    %vx = trunc i32 %vx64
+    store i32 %px, %vx
+    %py = gep i32 y, i
+    %r = srem i64 i, 5
+    %vy64 = add i64 %r, 1
+    %vy = trunc i32 %vy64
+    store i32 %py, %vy
+    %i2 = add i64 i, 1
+    br af(%i2, x, y)
+  reps(r: i64, x: ptr, y: ptr):
+    %c = icmp.slt i64 r, 1
+    condbr %c, docall(r, x, y), sum(0, 0, y)
+  docall(r: i64, x: ptr, y: ptr):
+    call void saxpy(y, x, 1048576, 3)
+    %r2 = add i64 r, 1
+    br reps(%r2, x, y)
+  sum(i: i64, s: i64, y: ptr):
+    %c = icmp.slt i64 i, 1048576
+    condbr %c, sumb(i, s, y), fin(s)
+  sumb(i: i64, s: i64, y: ptr):
+    %p = gep i32 y, i
+    %v = load i32, %p
+    %ve = zext i64 %v
+    %s2 = add i64 s, %ve
+    %i2 = add i64 i, 1
+    br sum(%i2, %s2, y)
+  fin(s: i64):
+    ret s
+}

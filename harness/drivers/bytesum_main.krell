@@ -1,0 +1,29 @@
+extern malloc(i64) -> ptr
+fn main() -> i64 {
+  entry():
+    %buf = call ptr malloc(4194304)
+    br bf(0, %buf)
+  bf(i: i64, buf: ptr):
+    %c = icmp.slt i64 i, 4194304
+    condbr %c, bfb(i, buf), reps(0, 0, buf)
+  bfb(i: i64, buf: ptr):
+    %i32 = trunc i32 i
+    %m = mul i32 %i32, 1103515245
+    %a = add i32 %m, 12345
+    %s = lshr i32 %a, 16
+    %b = and i32 %s, 255
+    %bb = trunc i8 %b
+    %p = gep i8 buf, i
+    store i8 %p, %bb
+    %i2 = add i64 i, 1
+    br bf(%i2, buf)
+  reps(r: i64, last: i64, buf: ptr):
+    %c = icmp.slt i64 r, 1
+    condbr %c, docall(r, buf), fin(last)
+  docall(r: i64, buf: ptr):
+    %s = call i64 bytesum(buf, 4194304)
+    %r2 = add i64 r, 1
+    br reps(%r2, %s, buf)
+  fin(s: i64):
+    ret s
+}

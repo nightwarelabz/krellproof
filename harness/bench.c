@@ -24,6 +24,12 @@ int64_t ref_sumsq(const int64_t *, int64_t);
 int64_t ref_fib(int64_t);
 void ref_histo(const uint8_t *, int64_t, int64_t *);
 uint64_t ref_fnv1a(const uint8_t *, int64_t);
+int64_t ref_dot(const int64_t *, const int64_t *, int64_t);
+void ref_saxpy(int32_t *, const int32_t *, int64_t, int32_t);
+void ref_copy(uint32_t *, const uint32_t *, int64_t);
+uint64_t ref_bytesum(const uint8_t *, int64_t);
+int64_t ref_parse(const uint8_t *, int64_t);
+void ref_mix(uint64_t *, const uint64_t *, int64_t);
 
 /* Krell-compiled kernels */
 void fill32(void *, int64_t, int32_t);
@@ -32,6 +38,12 @@ int64_t sumsq(const void *, int64_t);
 int64_t fib(int64_t);
 void histo(const void *, int64_t, void *);
 int64_t fnv1a(const void *, int64_t);
+int64_t dot(const void *, const void *, int64_t);
+void saxpy(void *, const void *, int64_t, int32_t);
+void copy(void *, const void *, int64_t);
+int64_t bytesum(const void *, int64_t);
+int64_t parse(const void *, int64_t);
+void mix(void *, const void *, int64_t);
 
 static double now_s(void) {
     struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -161,6 +173,74 @@ static void run_fnv_k(void *ctx, int reps) {
     (void)sink; (void)ctx;
 }
 
+/* ---------------- WP5 kernels ---------------- */
+#define STREAM_N (1 << 20)
+static int64_t *dot_a, *dot_b;
+static int32_t *sax_x, *sax_ya, *sax_yb;
+static uint32_t *copy_src, *copy_da, *copy_db;
+static uint8_t *parse_buf;
+static uint64_t *mix_src, *mix_da, *mix_db;
+static void run_dot_c(void *ctx, int reps) {
+    volatile int64_t sink;
+    for (int i = 0; i < reps; i++) sink = ref_dot(dot_a, dot_b, STREAM_N);
+    (void)sink; (void)ctx;
+}
+static void run_dot_k(void *ctx, int reps) {
+    volatile int64_t sink;
+    for (int i = 0; i < reps; i++) sink = dot(dot_a, dot_b, STREAM_N);
+    (void)sink; (void)ctx;
+}
+static void run_saxpy_c(void *ctx, int reps) {
+    (void)ctx;
+    for (int i = 0; i < reps; i++) ref_saxpy(sax_ya, sax_x, STREAM_N, 3);
+}
+static void run_saxpy_k(void *ctx, int reps) {
+    (void)ctx;
+    for (int i = 0; i < reps; i++) saxpy(sax_yb, sax_x, STREAM_N, 3);
+}
+static void run_copy_c(void *ctx, int reps) {
+    (void)ctx;
+    for (int i = 0; i < reps; i++) ref_copy(copy_da, copy_src, STREAM_N);
+}
+static void run_copy_k(void *ctx, int reps) {
+    (void)ctx;
+    for (int i = 0; i < reps; i++) copy(copy_db, copy_src, STREAM_N);
+}
+static void run_bytesum_c(void *ctx, int reps) {
+    volatile uint64_t sink;
+    for (int i = 0; i < reps; i++) sink = ref_bytesum(bytes_buf, BYTES_N);
+    (void)sink; (void)ctx;
+}
+static void run_bytesum_k(void *ctx, int reps) {
+    volatile int64_t sink;
+    for (int i = 0; i < reps; i++) sink = bytesum(bytes_buf, BYTES_N);
+    (void)sink; (void)ctx;
+}
+#define PARSE_N (1 << 20)
+static void run_parse_c(void *ctx, int reps) {
+    volatile int64_t sink;
+    for (int i = 0; i < reps; i++) sink = ref_parse(parse_buf, PARSE_N);
+    (void)sink; (void)ctx;
+}
+static void run_parse_k(void *ctx, int reps) {
+    volatile int64_t sink;
+    for (int i = 0; i < reps; i++) sink = parse(parse_buf, PARSE_N);
+    (void)sink; (void)ctx;
+}
+static void run_mix_c(void *ctx, int reps) {
+    (void)ctx;
+    for (int i = 0; i < reps; i++) ref_mix(mix_da, mix_src, STREAM_N);
+}
+static void run_mix_k(void *ctx, int reps) {
+    (void)ctx;
+    for (int i = 0; i < reps; i++) mix(mix_db, mix_src, STREAM_N);
+}
+static unsigned long long sum_u64(const uint64_t *b, int64_t n) {
+    unsigned long long s = 0;
+    for (int64_t i = 0; i < n; i++) s += (unsigned long long)b[i];
+    return s;
+}
+
 int main(void) {
     double med;
     fill_buf_a = malloc(FILL_N * 4);
@@ -172,6 +252,31 @@ int main(void) {
     for (int64_t i = 0; i < SUMSQ_N; i++) sumsq_a[i] = i + 1;
     for (int64_t i = 0; i < BYTES_N; i++)
         bytes_buf[i] = (uint8_t)(((uint32_t)i * 1103515245u + 12345u) >> 16);
+    dot_a = malloc(STREAM_N * 8);
+    dot_b = malloc(STREAM_N * 8);
+    sax_x = malloc(STREAM_N * 4);
+    sax_ya = malloc(STREAM_N * 4);
+    sax_yb = malloc(STREAM_N * 4);
+    copy_src = malloc(STREAM_N * 4);
+    copy_da = malloc(STREAM_N * 4);
+    copy_db = malloc(STREAM_N * 4);
+    parse_buf = malloc(PARSE_N);
+    mix_src = malloc(STREAM_N * 8);
+    mix_da = malloc(STREAM_N * 8);
+    mix_db = malloc(STREAM_N * 8);
+    if (!dot_a || !dot_b || !sax_x || !sax_ya || !sax_yb || !copy_src ||
+        !copy_da || !copy_db || !parse_buf || !mix_src || !mix_da || !mix_db)
+        return 2;
+    for (int64_t i = 0; i < STREAM_N; i++) {
+        dot_a[i] = i + 1;
+        dot_b[i] = (i % 7) + 3;
+        sax_x[i] = (int32_t)(i + 1);
+        sax_ya[i] = sax_yb[i] = (int32_t)((i % 5) + 1);
+        copy_src[i] = (uint32_t)((uint32_t)i * 2654435761u) >> 8;
+        mix_src[i] = (uint64_t)(i + 1);
+    }
+    for (int64_t g = 0; g < PARSE_N / 8; g++)
+        memcpy(parse_buf + g * 8, "1234567 ", 8);
 
     /* fill32 */
     ref_fill32(fill_buf_a, FILL_N, 0x12345678u);
@@ -235,6 +340,67 @@ int main(void) {
           double bk = bench(run_fnv_k, NULL, 5, &med), mk = med;
           emit("fnv1a", IMPL_NAME, bc, mc, (unsigned long long)rc);
           emit("fnv1a", "krell", bk, mk, (unsigned long long)rk); }
+    }
+    /* dot */
+    {
+        int64_t rc = ref_dot(dot_a, dot_b, STREAM_N), rk = dot(dot_a, dot_b, STREAM_N);
+        if (rc != rk) die("dot", "value mismatch");
+        { double bc = bench(run_dot_c, NULL, 20, &med), mc = med;
+          double bk = bench(run_dot_k, NULL, 20, &med), mk = med;
+          emit("dot", IMPL_NAME, bc, mc, (unsigned long long)rc);
+          emit("dot", "krell", bk, mk, (unsigned long long)rk); }
+    }
+    /* saxpy: checksum is the output after exactly one application */
+    ref_saxpy(sax_ya, sax_x, STREAM_N, 3);
+    saxpy(sax_yb, sax_x, STREAM_N, 3);
+    if (memcmp(sax_ya, sax_yb, STREAM_N * 4)) die("saxpy", "output mismatch");
+    {
+        unsigned long long cs = sum_u32((const uint32_t *)sax_ya, STREAM_N);
+        double bc = bench(run_saxpy_c, NULL, 20, &med), mc = med;
+        double bk = bench(run_saxpy_k, NULL, 20, &med), mk = med;
+        emit("saxpy", IMPL_NAME, bc, mc, cs);
+        emit("saxpy", "krell", bk, mk, cs);
+    }
+    /* copy */
+    ref_copy(copy_da, copy_src, STREAM_N);
+    copy(copy_db, copy_src, STREAM_N);
+    if (memcmp(copy_da, copy_db, STREAM_N * 4)) die("copy", "output mismatch");
+    {
+        unsigned long long cs = sum_u32(copy_src, STREAM_N);
+        double bc = bench(run_copy_c, NULL, 20, &med), mc = med;
+        double bk = bench(run_copy_k, NULL, 20, &med), mk = med;
+        emit("copy", IMPL_NAME, bc, mc, cs);
+        emit("copy", "krell", bk, mk, cs);
+    }
+    /* bytesum */
+    {
+        uint64_t rc = ref_bytesum(bytes_buf, BYTES_N);
+        int64_t rk = bytesum(bytes_buf, BYTES_N);
+        if (rc != (uint64_t)rk) die("bytesum", "value mismatch");
+        { double bc = bench(run_bytesum_c, NULL, 5, &med), mc = med;
+          double bk = bench(run_bytesum_k, NULL, 5, &med), mk = med;
+          emit("bytesum", IMPL_NAME, bc, mc, (unsigned long long)rc);
+          emit("bytesum", "krell", bk, mk, (unsigned long long)rk); }
+    }
+    /* parse */
+    {
+        int64_t rc = ref_parse(parse_buf, PARSE_N), rk = parse(parse_buf, PARSE_N);
+        if (rc != rk) die("parse", "value mismatch");
+        { double bc = bench(run_parse_c, NULL, 10, &med), mc = med;
+          double bk = bench(run_parse_k, NULL, 10, &med), mk = med;
+          emit("parse", IMPL_NAME, bc, mc, (unsigned long long)rc);
+          emit("parse", "krell", bk, mk, (unsigned long long)rk); }
+    }
+    /* mix */
+    ref_mix(mix_da, mix_src, STREAM_N);
+    mix(mix_db, mix_src, STREAM_N);
+    if (memcmp(mix_da, mix_db, STREAM_N * 8)) die("mix", "output mismatch");
+    {
+        unsigned long long cs = sum_u64(mix_da, STREAM_N);
+        double bc = bench(run_mix_c, NULL, 20, &med), mc = med;
+        double bk = bench(run_mix_k, NULL, 20, &med), mk = med;
+        emit("mix", IMPL_NAME, bc, mc, cs);
+        emit("mix", "krell", bk, mk, cs);
     }
     return 0;
 }

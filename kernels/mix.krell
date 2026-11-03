@@ -1,0 +1,25 @@
+fn mix(ptr, ptr, i64) {
+  entry(d: ptr, s: ptr, n: i64):
+    br loop(0, d, s, n)
+  loop(i: i64, d: ptr, s: ptr, n: i64):
+    %c = icmp.slt i64 i, n
+    condbr %c, body(i, d, s, n), done()
+  body(i: i64, d: ptr, s: ptr, n: i64):
+    %ps = gep i64 s, i
+    %x = load i64, %ps
+    %z0 = add i64 %x, -7046029254386353131
+    %s1 = lshr i64 %z0, 30
+    %z1 = xor i64 %z0, %s1
+    %z2 = mul i64 %z1, -4658895280553007687
+    %s2 = lshr i64 %z2, 27
+    %z3 = xor i64 %z2, %s2
+    %z4 = mul i64 %z3, -7723592293110705685
+    %s3 = lshr i64 %z4, 31
+    %z5 = xor i64 %z4, %s3
+    %pd = gep i64 d, i
+    store i64 %pd, %z5
+    %i2 = add i64 i, 1
+    br loop(%i2, d, s, n)
+  done():
+    ret
+}

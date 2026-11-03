@@ -1,0 +1,16 @@
+fn bytesum(ptr, i64) -> i64 {
+  entry(a: ptr, n: i64):
+    br loop(0, 0, a, n)
+  loop(i: i64, s: i64, a: ptr, n: i64):
+    %c = icmp.slt i64 i, n
+    condbr %c, body(i, s, a, n), done(s)
+  body(i: i64, s: i64, a: ptr, n: i64):
+    %p = gep i8 a, i
+    %v = load i8, %p
+    %ve = zext i64 %v
+    %s2 = add i64 s, %ve
+    %i2 = add i64 i, 1
+    br loop(%i2, %s2, a, n)
+  done(s: i64):
+    ret s
+}

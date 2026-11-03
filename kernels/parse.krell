@@ -1,0 +1,42 @@
+fn parse(ptr, i64) -> i64 {
+  entry(a: ptr, n: i64):
+    br loop(0, 0, 0, 0, a, n, 1)
+  loop(i: i64, s: i64, cur: i64, inn: i64, a: ptr, n: i64, one: i64):
+    %c = icmp.slt i64 i, n
+    condbr %c, body(i, s, cur, inn, a, n, one), fin(s, cur, inn)
+  body(i: i64, s: i64, cur: i64, inn: i64, a: ptr, n: i64, one: i64):
+    %p = gep i8 a, i
+    %v = load i8, %p
+    %ve = zext i64 %v
+    %lo = icmp.sge i64 %ve, 48
+    %loe = zext i64 %lo
+    %hi = icmp.sle i64 %ve, 57
+    %hie = zext i64 %hi
+    %isd = and i64 %loe, %hie
+    %isdb = icmp.ne i64 %isd, 0
+    condbr %isdb, dig(i, s, cur, a, n, one, %ve), delim(i, s, cur, inn, a, n, one)
+  dig(i: i64, s: i64, cur: i64, a: ptr, n: i64, one: i64, ve: i64):
+    %d = sub i64 %ve, 48
+    %t = mul i64 cur, 10
+    %cur2 = add i64 %t, %d
+    %i2 = add i64 i, one
+    br loop(%i2, s, %cur2, one, a, n, one)
+  delim(i: i64, s: i64, cur: i64, inn: i64, a: ptr, n: i64, one: i64):
+    %has = icmp.ne i64 inn, 0
+    condbr %has, dadd(i, s, cur, a, n, one), dskip(i, s, a, n, one)
+  dadd(i: i64, s: i64, cur: i64, a: ptr, n: i64, one: i64):
+    %s2 = add i64 s, cur
+    %i2 = add i64 i, one
+    br loop(%i2, %s2, 0, 0, a, n, one)
+  dskip(i: i64, s: i64, a: ptr, n: i64, one: i64):
+    %i2 = add i64 i, one
+    br loop(%i2, s, 0, 0, a, n, one)
+  fin(s: i64, cur: i64, inn: i64):
+    %has = icmp.ne i64 inn, 0
+    condbr %has, finadd(s, cur), fin2(s)
+  finadd(s: i64, cur: i64):
+    %s2 = add i64 s, cur
+    br fin2(%s2)
+  fin2(s: i64):
+    ret s
+}

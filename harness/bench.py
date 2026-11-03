@@ -67,6 +67,9 @@ TEX_NP = ((np.arange(4096, dtype=np.uint32) * np.uint32(2654435761))
 TEX_PY = TEX_NP.tolist()
 A_NP = np.arange(1, SUMSQ_N + 1, dtype=np.int64)
 BUF_NP = np.frombuffer(PATTERN, dtype=np.uint8)
+STREAM_N = 1 << 20
+B_NP = (np.arange(STREAM_N, dtype=np.int64) % 7) + 3
+PARSE_TEXT = b"1234567 " * (STREAM_N // 8)
 
 # ---------------------------------------------------------------- pure python
 def py_fill32():
@@ -142,6 +145,71 @@ def run_python():
     best, med = bench(fv, 2)
     emit("fnv1a", "python", best, med, holder[0])
 
+    # dot
+    a64 = list(range(1, STREAM_N + 1))
+    b64 = [(i % 7) + 3 for i in range(STREAM_N)]
+    holder[0] = 0
+    def dt():
+        s = 0
+        for i in range(STREAM_N):
+            s += a64[i] * b64[i]
+        holder[0] = s & MASK64
+    best, med = bench(dt, 3)
+    emit("dot", "python", best, med, holder[0])
+
+    # saxpy: checksum is the output after exactly one application
+    xs = [(i + 1) & 0xFFFFFFFF for i in range(STREAM_N)]
+    y0 = [(i % 5) + 1 for i in range(STREAM_N)]
+    y1 = list(y0)
+    for i in range(STREAM_N):
+        y1[i] = (3 * xs[i] + y1[i]) & 0xFFFFFFFF
+    sax_checksum = sum(y1)
+    yt = list(y0)
+    def sx():
+        for i in range(STREAM_N):
+            yt[i] = (3 * xs[i] + yt[i]) & 0xFFFFFFFF
+    best, med = bench(sx, 3)
+    emit("saxpy", "python", best, med, sax_checksum)
+
+    # copy
+    src32 = [(((i * 2654435761) & 0xFFFFFFFF) >> 8) for i in range(STREAM_N)]
+    dst32 = [0] * STREAM_N
+    def cp():
+        for i in range(STREAM_N):
+            dst32[i] = src32[i]
+    best, med = bench(cp, 3)
+    emit("copy", "python", best, med, sum(src32))
+
+    # bytesum
+    holder[0] = 0
+    def bs():
+        s = 0
+        for b in PATTERN:
+            s += b
+        holder[0] = s
+    best, med = bench(bs, 2)
+    emit("bytesum", "python", best, med, holder[0])
+
+    # parse
+    holder[0] = 0
+    def pa():
+        holder[0] = sum(int(t) for t in PARSE_TEXT.split())
+    best, med = bench(pa, 2)
+    emit("parse", "python", best, med, holder[0])
+
+    # mix (splitmix64 finalizer per element)
+    holder[0] = 0
+    def mx():
+        s = 0
+        for i in range(STREAM_N):
+            z = (i + 1 + 0x9E3779B97F4A7C15) & MASK64
+            z = ((z ^ (z >> 30)) * 0xBF58476D1CE4E5B9) & MASK64
+            z = ((z ^ (z >> 27)) * 0x94D049BB133111EB) & MASK64
+            s = (s + (z ^ (z >> 31))) & MASK64
+        holder[0] = s
+    best, med = bench(mx, 2)
+    emit("mix", "python", best, med, holder[0])
+
 
 # ---------------------------------------------------------------- numpy
 def run_numpy():
@@ -178,14 +246,59 @@ def run_numpy():
          sum((i + 1) * int(h[i]) for i in range(256)))
     # fib and fnv1a have no honest NumPy form (recursion / serial chain).
 
+    def dt():
+        return np.dot(A_NP, B_NP)
+    best, med = bench(dt, 20)
+    emit("dot", "numpy", best, med, int(dt()))
+
+    # saxpy: checksum is the output after exactly one application
+    xs32 = (np.arange(1, STREAM_N + 1, dtype=np.uint32) & np.uint32(0xFFFFFFFF)).astype(np.int32)
+    y0_32 = ((np.arange(STREAM_N, dtype=np.int64) % 5) + 1).astype(np.int32)
+    y1_32 = y0_32 * np.int32(1)
+    y1_32 = np.int32(3) * xs32 + y1_32
+    sax_checksum = int(y1_32.astype(np.uint32).sum(dtype=np.uint64))
+    yt_32 = y0_32.copy()
+    def sx():
+        yt_32[:] = np.int32(3) * xs32 + yt_32
+    best, med = bench(sx, 20)
+    emit("saxpy", "numpy", best, med, sax_checksum)
+
+    src_np = (((np.arange(STREAM_N, dtype=np.uint32) * np.uint32(2654435761))
+               >> np.uint32(8)).astype(np.uint32))
+    dst_np = np.empty(STREAM_N, dtype=np.uint32)
+    def cp():
+        np.copyto(dst_np, src_np)
+    best, med = bench(cp, 20)
+    emit("copy", "numpy", best, med, int(src_np.sum(dtype=np.uint64)))
+
+    def bs():
+        return np.sum(BUF_NP, dtype=np.uint64)
+    best, med = bench(bs, 10)
+    emit("bytesum", "numpy", best, med, int(bs()))
+    # parse has no honest NumPy form (stateful scan).
+
+    mix_src = np.arange(1, STREAM_N + 1, dtype=np.uint64)
+    def mx():
+        z = mix_src + np.uint64(0x9E3779B97F4A7C15)
+        z = (z ^ (z >> np.uint64(30))) * np.uint64(0xBF58476D1CE4E5B9)
+        z = (z ^ (z >> np.uint64(27))) * np.uint64(0x94D049BB133111EB)
+        return z ^ (z >> np.uint64(31))
+    best, med = bench(mx, 20)
+    emit("mix", "numpy", best, med, int(mx().sum(dtype=np.uint64)))
+
 
 # ---------------------------------------------------------------- interpreter
 INTERP_REPS = {  # (R1, R2) for the two-point slope
     "fill32": (2, 6), "span": (100, 300), "sumsq": (2, 6),
     "fib": (1, 3), "histo": (1, 4), "fnv1a": (1, 4),
+    "dot": (2, 6), "saxpy": (2, 6), "copy": (2, 6),
+    "bytesum": (1, 4), "parse": (1, 3), "mix": (2, 6),
 }
 SUM_TARGET = {"fill32": ("sum(0, 0, buf)", "fin(0)"),
-              "span": ("sum(0, 0, dst)", "fin(0)")}
+              "span": ("sum(0, 0, dst)", "fin(0)"),
+              "saxpy": ("sum(0, 0, y)", "fin(0)"),
+              "copy": ("sum(0, 0, dst)", "fin(0)"),
+              "mix": ("sum(0, 0, dst)", "fin(0)")}
 
 
 def krell_run(path):
@@ -287,7 +400,8 @@ def merge():
     print("\n=== ratios vs C -O2 (best ns; >1 = slower than C -O2) ===")
     impls_all = ["c_o0", "c_o1", "c_o2", "krell", "krell_interp", "python", "numpy"]
     print(f"{'kernel':9s}" + "".join(f"{i:>14s}" for i in impls_all))
-    for kernel in ("fill32", "span", "sumsq", "fib", "histo", "fnv1a"):
+    for kernel in ("fill32", "span", "sumsq", "fib", "histo", "fnv1a",
+                   "dot", "saxpy", "copy", "bytesum", "parse", "mix"):
         line = f"{kernel:9s}"
         for i in impls_all:
             v = ratios.get(kernel, {}).get(i)

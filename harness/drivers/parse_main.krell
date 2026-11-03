@@ -1,0 +1,61 @@
+extern malloc(i64) -> ptr
+fn main() -> i64 {
+  entry():
+    %buf = call ptr malloc(1048576)
+    br bf(0, %buf, 49)
+  bf(g: i64, buf: ptr, c49: i64):
+    %c = icmp.slt i64 g, 131072
+    condbr %c, bfb(g, buf, c49), reps(0, 0, buf)
+  bfb(g: i64, buf: ptr, c49: i64):
+    %base = mul i64 g, 8
+    %i0 = add i64 %base, 0
+    %p0 = gep i8 buf, %i0
+    %b0 = trunc i8 c49
+    store i8 %p0, %b0
+    %c1 = add i64 c49, 1
+    %i1 = add i64 %base, 1
+    %p1 = gep i8 buf, %i1
+    %b1 = trunc i8 %c1
+    store i8 %p1, %b1
+    %c2 = add i64 c49, 2
+    %i2 = add i64 %base, 2
+    %p2 = gep i8 buf, %i2
+    %b2 = trunc i8 %c2
+    store i8 %p2, %b2
+    %c3 = add i64 c49, 3
+    %i3 = add i64 %base, 3
+    %p3 = gep i8 buf, %i3
+    %b3 = trunc i8 %c3
+    store i8 %p3, %b3
+    %c4 = add i64 c49, 4
+    %i4 = add i64 %base, 4
+    %p4 = gep i8 buf, %i4
+    %b4 = trunc i8 %c4
+    store i8 %p4, %b4
+    %c5 = add i64 c49, 5
+    %i5 = add i64 %base, 5
+    %p5 = gep i8 buf, %i5
+    %b5 = trunc i8 %c5
+    store i8 %p5, %b5
+    %c6 = add i64 c49, 6
+    %i6 = add i64 %base, 6
+    %p6 = gep i8 buf, %i6
+    %b6 = trunc i8 %c6
+    store i8 %p6, %b6
+    %csp = sub i64 c49, 17
+    %i7 = add i64 %base, 7
+    %p7 = gep i8 buf, %i7
+    %b7 = trunc i8 %csp
+    store i8 %p7, %b7
+    %g2 = add i64 g, 1
+    br bf(%g2, buf, c49)
+  reps(r: i64, last: i64, buf: ptr):
+    %c = icmp.slt i64 r, 1
+    condbr %c, docall(r, buf), fin(last)
+  docall(r: i64, buf: ptr):
+    %s = call i64 parse(buf, 1048576)
+    %r2 = add i64 r, 1
+    br reps(%r2, %s, buf)
+  fin(s: i64):
+    ret s
+}

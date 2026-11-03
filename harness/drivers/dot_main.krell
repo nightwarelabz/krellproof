@@ -1,0 +1,29 @@
+extern malloc(i64) -> ptr
+fn main() -> i64 {
+  entry():
+    %a = call ptr malloc(8388608)
+    %b = call ptr malloc(8388608)
+    br af(0, %a, %b)
+  af(i: i64, a: ptr, b: ptr):
+    %c = icmp.slt i64 i, 1048576
+    condbr %c, afb(i, a, b), reps(0, 0, a, b)
+  afb(i: i64, a: ptr, b: ptr):
+    %pa = gep i64 a, i
+    %va = add i64 i, 1
+    store i64 %pa, %va
+    %pb = gep i64 b, i
+    %r = srem i64 i, 7
+    %vb = add i64 %r, 3
+    store i64 %pb, %vb
+    %i2 = add i64 i, 1
+    br af(%i2, a, b)
+  reps(r: i64, last: i64, a: ptr, b: ptr):
+    %c = icmp.slt i64 r, 2
+    condbr %c, docall(r, a, b), fin(last)
+  docall(r: i64, a: ptr, b: ptr):
+    %s = call i64 dot(a, b, 1048576)
+    %r2 = add i64 r, 1
+    br reps(%r2, %s, a, b)
+  fin(s: i64):
+    ret s
+}
