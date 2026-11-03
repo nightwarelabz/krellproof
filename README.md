@@ -65,10 +65,10 @@ The Krell LLVM rows come from a fourth harness binary built the
 same way; it links the C -O2 references, verifies every checksum
 against them internally, and emits only its own rows.
 
-## Results (2026-11-03, v2.0 branch, WP12 run)
+## Results (2026-11-03, v2.0 branch, WP13 run)
 
 Run on the bench machine: AMD EPYC 9D25, gcc 13.3 -O2, Krell
-v2.0 tree (WP1-WP12). The LLVM lane of this run was built
+v2.0 tree (WP1-WP13). The LLVM lane of this run was built
 with clang 18 (the emscripten-bundled clang 19 used for the
 WP8-WP11 records was lost with its VM image); the lane's
 differential battery passes 4,546/0 under it. Best per-call
@@ -76,18 +76,18 @@ nanoseconds from `results/results.json`:
 
 | kernel | C -O0 | C -O1 | C -O2 | Krell | Krell LLVM | Krell interp | Python | NumPy |
 |---|---|---|---|---|---|---|---|---|
-| fill32 | 1.26M | 595.7K | 279.0K | 89.8K | 87.1K | 157.42M | 28.88M | 280.8K |
-| span | 25.1K | 13.6K | 16.3K | 9.3K | 9.8K | 1.84M | 2.15M | 78.4K |
-| sumsq | 1.86M | 778.1K | 763.8K | 492.1K | 566.8K | 167.21M | 57.27M | 1.13M |
-| fib | 17.55M | 16.72M | 4.87M | 25.3 | 10.0 | 1418.78M | 402.42M | -- |
-| histo | 6.77M | 2.26M | 2.25M | 2.24M | 2.21M | 762.58M | 175.36M | 14.57M |
-| fnv1a | 9.02M | 8.95M | 8.90M | 9.01M | 8.93M | 773.76M | 527.62M | -- |
-| dot | 1.95M | 773.3K | 803.9K | 814.6K | 731.9K | 208.84M | 81.40M | 1.18M |
-| saxpy | 2.28M | 732.3K | 728.1K | 275.5K | 290.6K | 223.65M | 132.57M | 483.1K |
-| copy | 1.61M | 575.3K | 569.5K | 186.6K | 186.0K | 169.92M | 40.42M | 149.8K |
-| bytesum | 5.26M | 2.25M | 2.23M | 2.26M | 1.12M | 669.07M | 110.29M | 3.44M |
-| parse | 2.38M | 1.08M | 1.05M | 999.5K | 1.03M | 480.25M | 20.24M | -- |
-| mix | 3.47M | 1.84M | 1.90M | 1.85M | 2.76M | 255.78M | 607.81M | 2.91M |
+| fill32 | 1.24M | 565.4K | 279.2K | 87.3K | 89.7K | 156.53M | 28.88M | 280.1K |
+| span | 23.1K | 13.6K | 12.8K | 9.2K | 9.8K | 1.82M | 2.10M | 79.2K |
+| sumsq | 1.83M | 742.1K | 768.8K | 494.5K | 564.0K | 173.10M | 56.94M | 1.13M |
+| fib | 17.26M | 16.82M | 4.90M | 25.3 | 10.0 | 1364.82M | 421.17M | -- |
+| histo | 6.72M | 2.31M | 2.26M | 2.24M | 2.21M | 774.74M | 177.00M | 14.59M |
+| fnv1a | 8.98M | 8.99M | 8.87M | 8.92M | 8.88M | 684.99M | 517.78M | -- |
+| dot | 1.91M | 762.7K | 805.8K | 766.9K | 739.4K | 200.64M | 85.68M | 1.17M |
+| saxpy | 2.24M | 729.9K | 729.4K | 269.3K | 292.3K | 213.90M | 132.61M | 465.4K |
+| copy | 1.64M | 569.4K | 569.3K | 187.8K | 184.9K | 180.35M | 39.83M | 179.4K |
+| bytesum | 5.29M | 2.23M | 2.23M | 843.8K | 598.2K | 657.36M | 109.02M | 3.43M |
+| parse | 2.37M | 1.09M | 1.09M | 1.09M | 1.02M | 543.08M | 19.93M | -- |
+| mix | 3.57M | 1.90M | 1.87M | 1.89M | 2.14M | 233.96M | 606.75M | 3.13M |
 
 ## Reading the results
 
@@ -346,6 +346,39 @@ nanoseconds from `results/results.json`:
   with 0 failures, AArch64 and RISC-V code generation
   verified, and all twelve kernels' checksums in
   agreement across every implementation in the run.
+
+- WP13 gives the widening reduction its SWAR form, in
+  the optimizer (kernels untouched). Where the WP12
+  class unrolls byte-at-a-time chains, the SWAR form
+  loads one accumulator-width word per step and sums
+  its elements in-register: one mask/shift level folds
+  element pairs into fields of twice the element width,
+  then a multiply by the field-replicated one collects
+  the field sums into the top field. The reduction is
+  exact on any endianness: fields are mask-isolated
+  before every add, and every partial field sum is
+  bounded by fields * 2 * (2^E - 1) < 2^(2E), so no
+  carry ever crosses a field boundary. The class runs
+  one word with one accumulator: past that, the native
+  allocator spills the reduction chain's intermediates
+  (measured on this kernel: one word 0.84M ns, two
+  words 1.00M, four words 1.41M). bytesum's native row
+  moves from 1.010 in the WP12 run to 0.378 here, and
+  the LLVM lane's from 0.501 to 0.268 -- the word form
+  also compiles better through clang than the byte
+  loop it previously auto-vectorized. Correctness was
+  checked independently of the bench: four buffer
+  patterns (all-ones, random, ramp, zeros) across 26
+  lengths including every word/tail boundary match the
+  C reference exactly. Geomean S against C -O2: native
+  10.492 across the original six, 4.200 across all
+  twelve (1.582 excluding fib); LLVM 11.844 and 4.559
+  (1.590 excluding fib). Gates: clean build under
+  -Werror, test suite green, x86_64 and LLVM
+  differential batteries at 4,546 cases with 0 failures,
+  AArch64 and RISC-V code generation verified, and all
+  twelve kernels' checksums in agreement across every
+  implementation in the run.
 
 The deterministic property no column can show: the Krell rows are
 produced by a total, verified IR whose outputs are byte-identical
