@@ -1,6 +1,6 @@
 # KRELLPROOF
 
-An assault stress bench for Krell-compiled code. Six small kernels --
+An assault stress bench for Krell-compiled code. Twelve small kernels --
 the shapes that show up inside real systems code -- are implemented
 identically in Krell, C, and Python, timed head-to-head on one machine,
 and required to produce byte-identical results before any number is
@@ -22,6 +22,12 @@ Krell from the bench results baked into its data tables).
 | fib | fib(32), naive recursion | raw call overhead |
 | histo | 4M byte histogram | load-increment-store, data-dependent |
 | fnv1a | 4M byte FNV-1a | serial dependency chain (latency floor) |
+| dot | 1M i64 pairs | multiply-accumulate reduction, two streams |
+| saxpy | 1M i32, y = 3x + y | fused multiply-add stream (integer) |
+| copy | 1M u32 stream copy | pure data movement |
+| bytesum | 4M byte sum | byte-load reduction / widening |
+| parse | 1M chars, sum of decimal integers | branchy state-machine scan |
+| mix | 1M u64 splitmix64 | wide integer multiply chain |
 
 The C references in `kernels/refs.c` define the semantics. Every
 implementation of a kernel must produce the same checksum
@@ -41,8 +47,9 @@ the merger refuses to publish a table when any checksum disagrees.
   which cancels process startup and buffer setup exactly.
 - **Python** -- pure-Python implementations (no library help).
 - **NumPy** -- vectorized forms where an honest one exists. fib has
-  none (the kernel is recursion itself) and fnv1a has none (the
-  kernel is a serial dependency chain); both are reported as absent,
+  none (the kernel is recursion itself), fnv1a has none (the
+  kernel is a serial dependency chain), and parse has none (the
+  kernel is a stateful scan); all three are reported as absent,
   not approximated.
 
 ## Protocol
@@ -52,94 +59,66 @@ per-call nanoseconds are recorded (Python fib: 3 rounds). The C and
 Krell-native rows come from a single harness binary per C opt level,
 so both sides of each comparison share buffers, protocol, and clock.
 
-## Results (2026-11-02, v2.0 branch)
+## Results (2026-11-02, v2.0 branch, WP5 run)
 
-Machine: Apple M1 (x86_64 binaries under Rosetta) -
-Apple clang 21.0.0 -O2 - Python 3.15.1 - NumPy 2.5.4 -
-Krell v2.0 development tree (WP1 vector lowering; WP2 x86_64 backend
-code generation; WP3 fragment superoptimization of hot inner loops;
-WP4 call, loop, and chain overhead polish; x86_64 native lane).
-The C reference here is clang, not gcc: the opponent changed with
-the machine, and every number below is from this one run.
+Run on the bench machine: AMD EPYC 9D25, gcc 13.3 -O2, Krell
+v2.0 tree (WP1-WP5). Best per-call nanoseconds from
+`results/results.json`:
 
-Best ns per call (lower is faster):
-
-| kernel | C -O0 | C -O1 | C -O2 | Krell native | Krell interp | Python | NumPy |
+| kernel | C -O0 | C -O1 | C -O2 | Krell | Krell interp | Python | NumPy |
 |---|---|---|---|---|---|---|---|
-| fill32 | 729.5K | 327.8K | 66.1K | 66.3K | 273.47M | 15.78M | 63.4K |
-| span | 14.7K | 6.1K | 6.1K | 5.5K | 2.27M | 1.16M | 29.5K |
-| sumsq | 1.18M | 521.3K | 419.0K | 270.0K | 292.51M | 45.22M | 367.8K |
-| fib | 13.79M | 5.95M | 6.37M | 5.92M | 4.17G | 211.24M | -- |
-| histo | 3.65M | 1.40M | 1.17M | 1.17M | 1.49G | 93.16M | 6.35M |
-| fnv1a | 9.87M | 5.26M | 5.26M | 5.26M | 1.24G | 384.31M | -- |
+| fill32 | 1.24M | 556.9K | 281.2K | 93.2K | 230.53M | 28.50M | 282.5K |
+| span | 23.1K | 13.4K | 12.9K | 9.3K | 2.83M | 2.21M | 77.6K |
+| sumsq | 1.84M | 719.0K | 761.5K | 476.4K | 241.80M | 78.25M | 1.14M |
+| fib | 17.24M | 16.97M | 4.90M | 9.84M | 3189.12M | 548.70M | -- |
+| histo | 6.72M | 2.25M | 2.25M | 2.22M | 749.27M | 248.88M | 14.20M |
+| fnv1a | 8.89M | 9.72M | 8.90M | 8.86M | 707.96M | 749.18M | -- |
+| dot | 1.90M | 765.6K | 802.8K | 727.2K | 195.95M | 85.35M | 1.19M |
+| saxpy | 2.23M | 726.7K | 733.4K | 1.64M | 212.34M | 178.90M | 581.2K |
+| copy | 1.60M | 571.1K | 570.2K | 568.5K | 167.83M | 47.49M | 182.1K |
+| bytesum | 5.20M | 2.24M | 2.25M | 2.22M | 612.00M | 120.55M | 3.41M |
+| parse | 2.34M | 1.08M | 1.05M | 2.39M | 474.82M | 21.81M | -- |
+| mix | 3.45M | 1.89M | 1.91M | 2.10M | 248.40M | 637.65M | 3.51M |
 
 ## Reading the results
 
-- fill32 remains in the memory-roofline band (ratio 1.044 in
-  this harness run). Both implementations move 4 MiB at ~64 GB/s
-  -- the memory-bandwidth roofline of the machine. There is no
-  headroom left in this domain for either side. Krell v1.1
-  measured 24.3x behind C on this kernel and machine class; the
-  gain came from vector lowering in the optimizer (WP1), not
-  from kernel changes -- the kernels are byte-identical to the
-  v1 run.
-- WP3 (fragment superoptimization of the hot inner loops) put
-  three kernels ahead of clang -O2. span runs at ratio 0.739
-  (S = 1.353x): a proved value-preserving rewrite of the 24-bit
-  per-pixel RGB lighting pipeline -- one 16-bit packed multiply
-  replacing three scalar multiplies -- lowered to a zero-spill
-  SSE2 sequence, 9.55x faster than the v1.1 baseline Krell time.
-  sumsq runs at 0.725 (S = 1.379x): the scalar reduction is
-  replaced by four independent accumulator streams with a
-  balanced pairwise tree reduction at loop exit, 5.27x over
-  baseline -- the beat-C attempt transferred here from WP1 is
-  closed. histo runs at 0.989 (S = 1.011x): 4-way unrolling
-  with all four byte loads issued before any increment
-  (memory-level parallelism), plus zero-extension/truncation
-  register coalescing that removes the intermediate moves,
-  4.66x over baseline.
-- WP3 also carried a register-allocation and ABI correctness
-  overhaul: dead intervals (defpos == endpos == 0) no longer
-  evict live arguments, moves into unallocated slots can no
-  longer overwrite the saved frame pointer at [rbp - 0], and
-  constant rematerialization (func_rebuild_constants) folds
-  immediates back into instructions. The differential battery
-  stands at 4,546 cases, 0 failures, and every checksum is
-  unchanged.
-- WP4 (call, loop, and chain overhead polish) closed the two
-  gaps WP3 left, against the WP3 run on this same harness as
-  baseline. fib runs at 0.929 (WP3: 1.543): the x86_64 backend
-  recognizes the binary self-recursion shape, converts the
-  second recursive call into an accumulation loop, and returns
-  base cases without building a frame -- sound because Krell
-  integer addition is total and associative, and the battery
-  and checksums are unchanged. fnv1a runs at 0.999 (WP3:
-  1.158): the optimizer recognizes the serial hash chain,
-  unrolls it four ways, and hoists the FNV prime constant out
-  of the loop into a dedicated register, where clang materializes
-  it once and the previous Krell code materialized it per byte.
-  histo is at parity (0.998; WP3: 0.989) with its inner-loop
-  spill removed. WP4 changes no code generation for fill32,
-  span, or sumsq -- their emitted code is byte-identical to the
-  WP3 toolchain -- so their movement against the WP3 run
-  (fill32 1.044 -> 1.004, span 0.739 -> 0.902, sumsq 0.725 ->
-  0.644) is run-to-run variance on a shared machine, not
-  software change, in either direction.
-- Headline: the geometric mean of S = T_C / T_Krell across the
-  six kernels is 1.108 on this run, up from 1.002 after WP3,
-  0.804 after WP2, 0.44 after WP1, and 0.235 for the v1.1
-  baseline measured the same way on this machine class. Krell
-  is ahead of clang -O2 overall on this bench; every kernel is
-  at or ahead of parity in this run, with fill32 bounded by
-  the memory roofline rather than by code generation.
-- On the original bench machine (AMD EPYC, gcc -O2), an
-  independent run of the same WP4 toolchain measured fill32
-  at 0.312x, span at 0.742x, sumsq at 0.807x, fib at 1.816x,
-  histo at 0.980x, and fnv1a at 1.015x vs C -O2, with every
-  checksum identical to the Mac run. The two machines disagree
-  on individual kernels -- they are measurements of different
-  opponents (gcc on EPYC vs clang under Rosetta on M1), which
-  is why the machine and compiler are stated with every table.
+- WP5 adds six kernels in domains the original six did not
+  cover: a two-stream reduction (dot), a fused multiply-add
+  stream (saxpy), pure data movement (copy), a widening byte
+  reduction (bytesum), a branchy text scan (parse), and a wide
+  multiply chain (mix). First measurements on this machine:
+  dot is ahead of C -O2 in its debut (0.906), copy and bytesum
+  are at parity (0.997, 0.987), and mix is close (1.100).
+  Two kernels trail and are the WP5 follow-up work: saxpy
+  (2.241) -- gcc vectorizes the i32 multiply-add stream and
+  the Krell optimizer does not yet -- and parse (2.268), whose
+  per-byte branch chain has no specialized lowering yet.
+- Headline for this run: the geometric mean of S = T_C / T_Krell
+  is 1.226 across the original six kernels and 0.968 across
+  all twelve -- the two trailing WP5 kernels are what pull the
+  twelve-kernel figure under 1. On the previous recorded run
+  (WP4, Apple M1 under Rosetta, clang 21) the original six
+  measured a geomean S of 1.108, up from 1.002 after WP3,
+  0.804 after WP2, and 0.44 after WP1. The two runs measure
+  different opponents and are not directly comparable kernel
+  by kernel.
+- fill32 on this machine is not roofline-bound the way it was
+  on the M1 run: the vectorized Krell store loop (93.2K) runs
+  about 3x faster than gcc -O2's (281.2K), which did not
+  vectorize the u32 store stream on this target. On the M1
+  both sides sat at the ~64 GB/s memory roofline (WP4 ratio
+  1.004) -- same kernels, different binding constraint.
+- WP3 (fragment superoptimization) and WP4 (call, loop, and
+  chain overhead polish) are recorded with the WP4 run: WP4
+  took fib from 1.543 to 0.929 and fnv1a from 1.158 to 0.999
+  against the WP3 run on that harness, with fill32, span, and
+  sumsq code generation byte-identical between the WP3 and
+  WP4 toolchains (their movement between those two Mac runs
+  was variance, verified by emitted-code comparison and
+  repeated timing). On this EPYC/gcc run fib measures 2.009;
+  the earlier WP4-toolchain run on this same machine measured
+  1.816, and the kernel remains the bench's most
+  variance-sensitive row.
 - Chart rendering note: the first WP3 build rendered this
   chart's glyph text fragmented. The cause was a register-pool
   change in the x86_64 backend that admitted RCX and RDX as
@@ -172,7 +151,7 @@ Outputs: `results/results.json` (merged, validated) and
 
 ## Layout
 
-    kernels/    the six kernels: .krell sources + refs.c
+    kernels/    the twelve kernels: .krell sources + refs.c
     harness/    bench.c (native timing), bench.py (Python + interp
                 timing, merge + validation), drivers/ (interp mains)
     graph/      gen_graph.py + generated graph.krell + graph.png
@@ -189,9 +168,11 @@ Outputs: `results/results.json` (merged, validated) and
   workaround was adopted.
 - Timings are best read as ratios between implementations measured
   minutes apart on one machine, not as absolute hardware numbers.
-  The recorded run for this branch was made under Rosetta on an
-  Apple M1 (x86_64 binaries); both sides of every comparison were
-  translated identically.
+  The recorded run for this branch was made on an AMD EPYC host
+  (native x86_64, gcc 13.3); the previous recorded run (WP4) was
+  made under Rosetta on an Apple M1 with clang 21, and the two
+  tables measure different opponents -- a kernel's ratio moving
+  between them is not, by itself, a regression or a gain.
 
 ## License
 

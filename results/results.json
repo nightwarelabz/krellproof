@@ -1,13 +1,13 @@
 {
  "meta": {
-  "date": "2026-11-02T16:55:54-0600",
-  "machine": "arm64",
-  "cpu": "",
-  "cores": 8,
-  "gcc": "Apple clang version 21.0.0 (clang-2100.4.1.1)",
-  "python": "3.15.1",
-  "numpy": "2.5.4",
-  "krellc": "/Users/chasebryan/krell/krellc",
+  "date": "2026-11-02T17:33:36-0600",
+  "machine": "x86_64",
+  "cpu": "AMD EPYC 9D25 126-Core Processor",
+  "cores": 4,
+  "gcc": "cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+  "python": "3.12.3",
+  "numpy": "1.26.4",
+  "krellc": "/home/hatch/workspace/wp4-work/krell-wp4/krellc",
   "krell_tree": "v1.1 tree",
   "protocol": "C/Krell native and Python: warmup + 7 rounds, best and median per-call ns (fib python: 3 rounds). Interpreter: two-point slope over two rep counts, best of 2 runs."
  },
@@ -15,336 +15,676 @@
   {
    "kernel": "fill32",
    "impl": "c_o0",
-   "best_ns": 729550.0,
-   "median_ns": 744400.0,
+   "best_ns": 1236924.3,
+   "median_ns": 1252870.3,
    "checksum": 320255972868096
   },
   {
    "kernel": "fill32",
    "impl": "krell",
-   "best_ns": 66350.0,
-   "median_ns": 68100.0,
+   "best_ns": 93208.3,
+   "median_ns": 98020.5,
    "checksum": 320255972868096
   },
   {
    "kernel": "span",
    "impl": "c_o0",
-   "best_ns": 14725.0,
-   "median_ns": 14770.0,
+   "best_ns": 23097.9,
+   "median_ns": 23237.5,
    "checksum": 28299366513
   },
   {
    "kernel": "span",
    "impl": "krell",
-   "best_ns": 5460.0,
-   "median_ns": 5520.0,
+   "best_ns": 9298.4,
+   "median_ns": 9376.3,
    "checksum": 28299366513
   },
   {
    "kernel": "sumsq",
    "impl": "c_o0",
-   "best_ns": 1178500.0,
-   "median_ns": 1183600.0,
+   "best_ns": 1838860.8,
+   "median_ns": 1879216.3,
    "checksum": 384307717958270976
   },
   {
    "kernel": "sumsq",
    "impl": "krell",
-   "best_ns": 270000.0,
-   "median_ns": 279450.0,
+   "best_ns": 476445.6,
+   "median_ns": 486267.9,
    "checksum": 384307717958270976
   },
   {
    "kernel": "fib",
    "impl": "c_o0",
-   "best_ns": 13787333.3,
-   "median_ns": 13804533.3,
+   "best_ns": 17244494.0,
+   "median_ns": 18565853.3,
    "checksum": 2178309
   },
   {
    "kernel": "fib",
    "impl": "krell",
-   "best_ns": 5917400.0,
-   "median_ns": 5922533.3,
+   "best_ns": 9838342.1,
+   "median_ns": 9944940.0,
    "checksum": 2178309
   },
   {
    "kernel": "histo",
    "impl": "c_o0",
-   "best_ns": 3650800.0,
-   "median_ns": 3657600.0,
+   "best_ns": 6724526.8,
+   "median_ns": 6748685.0,
    "checksum": 538969024
   },
   {
    "kernel": "histo",
    "impl": "krell",
-   "best_ns": 1169000.0,
-   "median_ns": 1173000.0,
+   "best_ns": 2218806.2,
+   "median_ns": 2228446.6,
    "checksum": 538969024
   },
   {
    "kernel": "fnv1a",
    "impl": "c_o0",
-   "best_ns": 9873400.0,
-   "median_ns": 9882400.0,
+   "best_ns": 8888094.2,
+   "median_ns": 8918311.4,
    "checksum": 3462303757254121957
   },
   {
    "kernel": "fnv1a",
    "impl": "krell",
-   "best_ns": 5261800.0,
-   "median_ns": 5267600.0,
+   "best_ns": 8855391.0,
+   "median_ns": 8897568.2,
    "checksum": 3462303757254121957
+  },
+  {
+   "kernel": "dot",
+   "impl": "c_o0",
+   "best_ns": 1898660.0,
+   "median_ns": 1909216.3,
+   "checksum": 3298535931902
+  },
+  {
+   "kernel": "dot",
+   "impl": "krell",
+   "best_ns": 727221.9,
+   "median_ns": 741452.7,
+   "checksum": 3298535931902
+  },
+  {
+   "kernel": "saxpy",
+   "impl": "c_o0",
+   "best_ns": 2228913.3,
+   "median_ns": 2240187.8,
+   "checksum": 1649272160254
+  },
+  {
+   "kernel": "saxpy",
+   "impl": "krell",
+   "best_ns": 1643258.4,
+   "median_ns": 1683818.7,
+   "checksum": 1649272160254
+  },
+  {
+   "kernel": "copy",
+   "impl": "c_o0",
+   "best_ns": 1603150.7,
+   "median_ns": 1609573.4,
+   "checksum": 8796079030272
+  },
+  {
+   "kernel": "copy",
+   "impl": "krell",
+   "best_ns": 568506.3,
+   "median_ns": 572637.4,
+   "checksum": 8796079030272
+  },
+  {
+   "kernel": "bytesum",
+   "impl": "c_o0",
+   "best_ns": 5200799.2,
+   "median_ns": 5241418.2,
+   "checksum": 534774720
+  },
+  {
+   "kernel": "bytesum",
+   "impl": "krell",
+   "best_ns": 2221836.8,
+   "median_ns": 2222942.4,
+   "checksum": 534774720
+  },
+  {
+   "kernel": "parse",
+   "impl": "c_o0",
+   "best_ns": 2343902.9,
+   "median_ns": 2346582.9,
+   "checksum": 161817165824
+  },
+  {
+   "kernel": "parse",
+   "impl": "krell",
+   "best_ns": 2389379.1,
+   "median_ns": 2675161.7,
+   "checksum": 161817165824
+  },
+  {
+   "kernel": "mix",
+   "impl": "c_o0",
+   "best_ns": 3446844.7,
+   "median_ns": 3515341.0,
+   "checksum": 14583257995973114678
+  },
+  {
+   "kernel": "mix",
+   "impl": "krell",
+   "best_ns": 2097823.2,
+   "median_ns": 2124048.1,
+   "checksum": 14583257995973114678
   },
   {
    "kernel": "fill32",
    "impl": "c_o1",
-   "best_ns": 327800.0,
-   "median_ns": 328450.0,
+   "best_ns": 556851.8,
+   "median_ns": 557549.9,
    "checksum": 320255972868096
   },
   {
    "kernel": "span",
    "impl": "c_o1",
-   "best_ns": 6055.0,
-   "median_ns": 6090.0,
+   "best_ns": 13384.5,
+   "median_ns": 13487.4,
    "checksum": 28299366513
   },
   {
    "kernel": "sumsq",
    "impl": "c_o1",
-   "best_ns": 521300.0,
-   "median_ns": 522000.0,
+   "best_ns": 718998.0,
+   "median_ns": 723361.5,
    "checksum": 384307717958270976
   },
   {
    "kernel": "fib",
    "impl": "c_o1",
-   "best_ns": 5945200.0,
-   "median_ns": 5977133.3,
+   "best_ns": 16968096.7,
+   "median_ns": 17210139.1,
    "checksum": 2178309
   },
   {
    "kernel": "histo",
    "impl": "c_o1",
-   "best_ns": 1395600.0,
-   "median_ns": 1397200.0,
+   "best_ns": 2249802.8,
+   "median_ns": 2283419.0,
    "checksum": 538969024
   },
   {
    "kernel": "fnv1a",
    "impl": "c_o1",
-   "best_ns": 5256800.0,
-   "median_ns": 5262000.0,
+   "best_ns": 9719240.8,
+   "median_ns": 17571114.6,
    "checksum": 3462303757254121957
+  },
+  {
+   "kernel": "dot",
+   "impl": "c_o1",
+   "best_ns": 765592.9,
+   "median_ns": 784588.9,
+   "checksum": 3298535931902
+  },
+  {
+   "kernel": "saxpy",
+   "impl": "c_o1",
+   "best_ns": 726737.6,
+   "median_ns": 769673.1,
+   "checksum": 1649272160254
+  },
+  {
+   "kernel": "copy",
+   "impl": "c_o1",
+   "best_ns": 571114.7,
+   "median_ns": 578867.8,
+   "checksum": 8796079030272
+  },
+  {
+   "kernel": "bytesum",
+   "impl": "c_o1",
+   "best_ns": 2244466.8,
+   "median_ns": 2265139.6,
+   "checksum": 534774720
+  },
+  {
+   "kernel": "parse",
+   "impl": "c_o1",
+   "best_ns": 1082892.4,
+   "median_ns": 1091938.9,
+   "checksum": 161817165824
+  },
+  {
+   "kernel": "mix",
+   "impl": "c_o1",
+   "best_ns": 1888377.5,
+   "median_ns": 1892686.0,
+   "checksum": 14583257995973114678
   },
   {
    "kernel": "fill32",
    "impl": "c_o2",
-   "best_ns": 66100.0,
-   "median_ns": 66600.0,
+   "best_ns": 281171.2,
+   "median_ns": 282997.4,
    "checksum": 320255972868096
   },
   {
    "kernel": "span",
    "impl": "c_o2",
-   "best_ns": 6055.0,
-   "median_ns": 6075.0,
+   "best_ns": 12913.1,
+   "median_ns": 13022.7,
    "checksum": 28299366513
   },
   {
    "kernel": "sumsq",
    "impl": "c_o2",
-   "best_ns": 419000.0,
-   "median_ns": 419650.0,
+   "best_ns": 761480.3,
+   "median_ns": 771673.0,
    "checksum": 384307717958270976
   },
   {
    "kernel": "fib",
    "impl": "c_o2",
-   "best_ns": 6372200.0,
-   "median_ns": 6382666.7,
+   "best_ns": 4897494.9,
+   "median_ns": 4952503.4,
    "checksum": 2178309
   },
   {
    "kernel": "histo",
    "impl": "c_o2",
-   "best_ns": 1171400.0,
-   "median_ns": 1178200.0,
+   "best_ns": 2245141.6,
+   "median_ns": 2251058.6,
    "checksum": 538969024
   },
   {
    "kernel": "fnv1a",
    "impl": "c_o2",
-   "best_ns": 5258200.0,
-   "median_ns": 5262200.0,
+   "best_ns": 8895469.2,
+   "median_ns": 8956398.4,
    "checksum": 3462303757254121957
+  },
+  {
+   "kernel": "dot",
+   "impl": "c_o2",
+   "best_ns": 802798.7,
+   "median_ns": 833143.2,
+   "checksum": 3298535931902
+  },
+  {
+   "kernel": "saxpy",
+   "impl": "c_o2",
+   "best_ns": 733355.6,
+   "median_ns": 739084.1,
+   "checksum": 1649272160254
+  },
+  {
+   "kernel": "copy",
+   "impl": "c_o2",
+   "best_ns": 570173.2,
+   "median_ns": 574147.7,
+   "checksum": 8796079030272
+  },
+  {
+   "kernel": "bytesum",
+   "impl": "c_o2",
+   "best_ns": 2250447.6,
+   "median_ns": 2255305.0,
+   "checksum": 534774720
+  },
+  {
+   "kernel": "parse",
+   "impl": "c_o2",
+   "best_ns": 1053414.1,
+   "median_ns": 1068319.5,
+   "checksum": 161817165824
+  },
+  {
+   "kernel": "mix",
+   "impl": "c_o2",
+   "best_ns": 1906325.0,
+   "median_ns": 1927612.4,
+   "checksum": 14583257995973114678
   },
   {
    "kernel": "fill32",
    "impl": "python",
-   "best_ns": 15782028.0,
-   "median_ns": 15800361.3,
+   "best_ns": 28498020.3,
+   "median_ns": 32451964.3,
    "checksum": 320255972868096
   },
   {
    "kernel": "span",
    "impl": "python",
-   "best_ns": 1158842.5,
-   "median_ns": 1164045.0,
+   "best_ns": 2210326.5,
+   "median_ns": 2244857.3,
    "checksum": 28299366513
   },
   {
    "kernel": "sumsq",
    "impl": "python",
-   "best_ns": 45216666.7,
-   "median_ns": 45330152.7,
+   "best_ns": 78246899.7,
+   "median_ns": 85039882.3,
    "checksum": 384307717958270976
   },
   {
    "kernel": "fib",
    "impl": "python",
-   "best_ns": 211235374.9,
-   "median_ns": 212795250.0,
+   "best_ns": 548703831.0,
+   "median_ns": 580668799.0,
    "checksum": 2178309
   },
   {
    "kernel": "histo",
    "impl": "python",
-   "best_ns": 93161458.5,
-   "median_ns": 93293375.0,
+   "best_ns": 248879107.0,
+   "median_ns": 266095175.5,
    "checksum": 538969024
   },
   {
    "kernel": "fnv1a",
    "impl": "python",
-   "best_ns": 384311187.5,
-   "median_ns": 386451020.5,
+   "best_ns": 749182528.0,
+   "median_ns": 779101336.0,
    "checksum": 3462303757254121957
+  },
+  {
+   "kernel": "dot",
+   "impl": "python",
+   "best_ns": 85349059.7,
+   "median_ns": 122047320.0,
+   "checksum": 3298535931902
+  },
+  {
+   "kernel": "saxpy",
+   "impl": "python",
+   "best_ns": 178895021.3,
+   "median_ns": 196267496.3,
+   "checksum": 1649272160254
+  },
+  {
+   "kernel": "copy",
+   "impl": "python",
+   "best_ns": 47486272.3,
+   "median_ns": 60622499.7,
+   "checksum": 8796079030272
+  },
+  {
+   "kernel": "bytesum",
+   "impl": "python",
+   "best_ns": 120551631.5,
+   "median_ns": 169603073.5,
+   "checksum": 534774720
+  },
+  {
+   "kernel": "parse",
+   "impl": "python",
+   "best_ns": 21812098.0,
+   "median_ns": 44998372.0,
+   "checksum": 161817165824
+  },
+  {
+   "kernel": "mix",
+   "impl": "python",
+   "best_ns": 637654747.5,
+   "median_ns": 678544837.0,
+   "checksum": 14583257995973114678
   },
   {
    "kernel": "fill32",
    "impl": "numpy",
-   "best_ns": 63364.6,
-   "median_ns": 64287.5,
+   "best_ns": 282536.8,
+   "median_ns": 286744.6,
    "checksum": 320255972868096
   },
   {
    "kernel": "span",
    "impl": "numpy",
-   "best_ns": 29543.3,
-   "median_ns": 29593.1,
+   "best_ns": 77599.5,
+   "median_ns": 78336.9,
    "checksum": 28299366513
   },
   {
    "kernel": "sumsq",
    "impl": "numpy",
-   "best_ns": 367829.2,
-   "median_ns": 372737.5,
+   "best_ns": 1135442.2,
+   "median_ns": 1141784.2,
    "checksum": 384307717958270976
   },
   {
    "kernel": "histo",
    "impl": "numpy",
-   "best_ns": 6350520.8,
-   "median_ns": 6358350.0,
+   "best_ns": 14195254.8,
+   "median_ns": 14868942.3,
    "checksum": 538969024
+  },
+  {
+   "kernel": "dot",
+   "impl": "numpy",
+   "best_ns": 1186468.2,
+   "median_ns": 1211394.1,
+   "checksum": 3298535931902
+  },
+  {
+   "kernel": "saxpy",
+   "impl": "numpy",
+   "best_ns": 581222.8,
+   "median_ns": 609402.1,
+   "checksum": 1649272160254
+  },
+  {
+   "kernel": "copy",
+   "impl": "numpy",
+   "best_ns": 182066.6,
+   "median_ns": 183892.9,
+   "checksum": 8796079030272
+  },
+  {
+   "kernel": "bytesum",
+   "impl": "numpy",
+   "best_ns": 3406663.9,
+   "median_ns": 3453357.0,
+   "checksum": 534774720
+  },
+  {
+   "kernel": "mix",
+   "impl": "numpy",
+   "best_ns": 3512391.1,
+   "median_ns": 3614642.4,
+   "checksum": 14583257995973114678
   },
   {
    "kernel": "fill32",
    "impl": "krell_interp",
-   "best_ns": 273473531.0,
-   "median_ns": 273473531.0,
+   "best_ns": 230530055.7,
+   "median_ns": 230530055.7,
    "checksum": 320255972868096
   },
   {
    "kernel": "span",
    "impl": "krell_interp",
-   "best_ns": 2201602.5,
-   "median_ns": 2201602.5,
+   "best_ns": 2829003.1,
+   "median_ns": 2829003.1,
    "checksum": 28299366513
   },
   {
    "kernel": "sumsq",
    "impl": "krell_interp",
-   "best_ns": 297092083.5,
-   "median_ns": 297092083.5,
+   "best_ns": 241804492.3,
+   "median_ns": 241804492.3,
    "checksum": 384307717958270976
   },
   {
    "kernel": "fib",
    "impl": "krell_interp",
-   "best_ns": 4033880729.5,
-   "median_ns": 4033880729.5,
+   "best_ns": 3189118743.5,
+   "median_ns": 3189118743.5,
    "checksum": 2178309
   },
   {
    "kernel": "histo",
    "impl": "krell_interp",
-   "best_ns": 1438380972.0,
-   "median_ns": 1438380972.0,
+   "best_ns": 749270616.7,
+   "median_ns": 749270616.7,
    "checksum": 538969024
   },
   {
    "kernel": "fnv1a",
    "impl": "krell_interp",
-   "best_ns": 1267164333.7,
-   "median_ns": 1267164333.7,
+   "best_ns": 707957551.0,
+   "median_ns": 707957551.0,
    "checksum": 3462303757254121957
+  },
+  {
+   "kernel": "dot",
+   "impl": "krell_interp",
+   "best_ns": 195948719.3,
+   "median_ns": 195948719.3,
+   "checksum": 3298535931902
+  },
+  {
+   "kernel": "saxpy",
+   "impl": "krell_interp",
+   "best_ns": 212344700.5,
+   "median_ns": 212344700.5,
+   "checksum": 1649272160254
+  },
+  {
+   "kernel": "copy",
+   "impl": "krell_interp",
+   "best_ns": 167830053.8,
+   "median_ns": 167830053.8,
+   "checksum": 8796079030272
+  },
+  {
+   "kernel": "bytesum",
+   "impl": "krell_interp",
+   "best_ns": 611998947.3,
+   "median_ns": 611998947.3,
+   "checksum": 534774720
+  },
+  {
+   "kernel": "parse",
+   "impl": "krell_interp",
+   "best_ns": 474823000.5,
+   "median_ns": 474823000.5,
+   "checksum": 161817165824
+  },
+  {
+   "kernel": "mix",
+   "impl": "krell_interp",
+   "best_ns": 248402356.5,
+   "median_ns": 248402356.5,
+   "checksum": 14583257995973114678
   }
  ],
  "ratios_vs_c_o2": {
   "fill32": {
-   "c_o0": 11.037,
-   "c_o1": 4.959,
+   "c_o0": 4.399,
+   "c_o1": 1.98,
    "c_o2": 1.0,
-   "krell": 1.004,
-   "krell_interp": 4137.27,
-   "numpy": 0.959,
-   "python": 238.76
+   "krell": 0.332,
+   "krell_interp": 819.892,
+   "numpy": 1.005,
+   "python": 101.355
   },
   "span": {
-   "c_o0": 2.432,
-   "c_o1": 1.0,
+   "c_o0": 1.789,
+   "c_o1": 1.037,
    "c_o2": 1.0,
-   "krell": 0.902,
-   "krell_interp": 363.601,
-   "numpy": 4.879,
-   "python": 191.386
+   "krell": 0.72,
+   "krell_interp": 219.08,
+   "numpy": 6.009,
+   "python": 171.169
   },
   "sumsq": {
-   "c_o0": 2.813,
-   "c_o1": 1.244,
+   "c_o0": 2.415,
+   "c_o1": 0.944,
    "c_o2": 1.0,
-   "krell": 0.644,
-   "krell_interp": 709.05,
-   "numpy": 0.878,
-   "python": 107.916
+   "krell": 0.626,
+   "krell_interp": 317.545,
+   "numpy": 1.491,
+   "python": 102.756
   },
   "fib": {
-   "c_o0": 2.164,
-   "c_o1": 0.933,
+   "c_o0": 3.521,
+   "c_o1": 3.465,
    "c_o2": 1.0,
-   "krell": 0.929,
-   "krell_interp": 633.044,
-   "python": 33.15
+   "krell": 2.009,
+   "krell_interp": 651.173,
+   "python": 112.038
   },
   "histo": {
-   "c_o0": 3.117,
-   "c_o1": 1.191,
+   "c_o0": 2.995,
+   "c_o1": 1.002,
    "c_o2": 1.0,
-   "krell": 0.998,
-   "krell_interp": 1227.916,
-   "numpy": 5.421,
-   "python": 79.53
+   "krell": 0.988,
+   "krell_interp": 333.73,
+   "numpy": 6.323,
+   "python": 110.852
   },
   "fnv1a": {
-   "c_o0": 1.878,
-   "c_o1": 1.0,
+   "c_o0": 0.999,
+   "c_o1": 1.093,
    "c_o2": 1.0,
-   "krell": 1.001,
-   "krell_interp": 240.988,
-   "python": 73.088
+   "krell": 0.995,
+   "krell_interp": 79.586,
+   "python": 84.221
+  },
+  "dot": {
+   "c_o0": 2.365,
+   "c_o1": 0.954,
+   "c_o2": 1.0,
+   "krell": 0.906,
+   "krell_interp": 244.082,
+   "numpy": 1.478,
+   "python": 106.314
+  },
+  "saxpy": {
+   "c_o0": 3.039,
+   "c_o1": 0.991,
+   "c_o2": 1.0,
+   "krell": 2.241,
+   "krell_interp": 289.552,
+   "numpy": 0.793,
+   "python": 243.94
+  },
+  "copy": {
+   "c_o0": 2.812,
+   "c_o1": 1.002,
+   "c_o2": 1.0,
+   "krell": 0.997,
+   "krell_interp": 294.349,
+   "numpy": 0.319,
+   "python": 83.284
+  },
+  "bytesum": {
+   "c_o0": 2.311,
+   "c_o1": 0.997,
+   "c_o2": 1.0,
+   "krell": 0.987,
+   "krell_interp": 271.945,
+   "numpy": 1.514,
+   "python": 53.568
+  },
+  "parse": {
+   "c_o0": 2.225,
+   "c_o1": 1.028,
+   "c_o2": 1.0,
+   "krell": 2.268,
+   "krell_interp": 450.747,
+   "python": 20.706
+  },
+  "mix": {
+   "c_o0": 1.808,
+   "c_o1": 0.991,
+   "c_o2": 1.0,
+   "krell": 1.1,
+   "krell_interp": 130.304,
+   "numpy": 1.842,
+   "python": 334.494
   }
  }
 }

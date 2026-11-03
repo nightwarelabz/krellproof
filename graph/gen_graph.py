@@ -14,7 +14,7 @@ import re
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
-W, H = 1760, 1290
+W, H = 1760, 2400
 
 # ------------------------------------------------------------------- font
 FONT = {
@@ -78,11 +78,15 @@ data = json.load(open(os.path.join(ROOT, "results", "results.json")))
 res = {(r["kernel"], r["impl"]): r for r in data["results"]}
 meta = data["meta"]
 
-KERNELS = ["fill32", "span", "sumsq", "fib", "histo", "fnv1a"]
+KERNELS = ["fill32", "span", "sumsq", "fib", "histo", "fnv1a",
+           "dot", "saxpy", "copy", "bytesum", "parse", "mix"]
 HEADERS = {
     "fill32": "FILL32 - 1M U32", "span": "SPAN - 4096 PX",
     "sumsq": "SUMSQ - 1M I64", "fib": "FIB(32) - RECURSIVE",
     "histo": "HISTO - 4M BYTES", "fnv1a": "FNV1A - 4M BYTES",
+    "dot": "DOT - 1M I64 PAIRS", "saxpy": "SAXPY - 1M I32",
+    "copy": "COPY - 1M U32", "bytesum": "BYTESUM - 4M BYTES",
+    "parse": "PARSE - 1M CHARS", "mix": "MIX - 1M U64 SPLITMIX",
 }
 IMPLS = [("c_o0", "C -O0"), ("c_o1", "C -O1"), ("c_o2", "C -O2"),
          ("krell", "KRELL"), ("krell_interp", "INTERP"),
@@ -165,7 +169,7 @@ date_short = meta.get("date", "")[:10]
 strings.append((
     f"{cpu_short} - {gcc_short} - PYTHON {meta.get('python', '')} - "
     f"NUMPY {meta.get('numpy', '')} - KRELL V1.1 - {date_short} - "
-    f"ALL CHECKSUMS IDENTICAL", 40, 1254, 2, TXT_FOOT))
+    f"ALL CHECKSUMS IDENTICAL", 40, 2364, 2, TXT_FOOT))
 
 GRID_OFFS = [round((d - LOG_LO) / (LOG_HI - LOG_LO) * BAR_MAXLEN)
              for d in (5, 6, 7, 8, 9)]
