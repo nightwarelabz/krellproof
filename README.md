@@ -121,6 +121,30 @@ v2.0 tree (WP1-WP5 tail). Best per-call nanoseconds from
   byte-identical to the WP5 run's (0.987), isolated runs of
   the native bench binary measure ~2.23M ns (~1.00), and the
   LLVM lane's 0.491 shows the shape itself is fast.
+- WP7 (interpreter, stretch package): the reference
+  interpreter now allocates one flat arena per frame instead
+  of one buffer per value, with every value's lane pointer
+  computed once at frame setup. Code generation is
+  untouched: the emitted assembly for all twelve kernels is
+  byte-identical between the WP6 and WP7 toolchains
+  (verified directly), so the recorded table above stands
+  for both lanes. The interpreter delta was measured by
+  paired A/B on this bench's own timing drivers (WP6
+  interpreter vs WP7 interpreter, back-to-back, per-call
+  nanoseconds): geomean new/old 0.832 across the twelve
+  kernels -- the interpreter runs about 1.2x faster
+  overall, with the call- and frame-heavy kernels gaining
+  most (sumsq 0.202, fib 0.496, bytesum 0.588, mix 0.774,
+  parse 0.898) and the streaming kernels at parity within
+  the host's noise band. Two full-suite re-runs attempted
+  for this package were discarded as host-load noise: in
+  both, columns for implementations that did not change at
+  all moved by factors no code change can explain (C -O1
+  saxpy at 0.149x C -O2 in one; NumPy span at 37-48x its
+  recorded 4.7x in both), so neither run measured anything
+  but the host. The interpreter A/B, which interleaves the
+  two binaries minutes apart on identical drivers, is the
+  WP7 evidence of record.
 - Headline for this run: the geometric mean of S = T_C / T_Krell
   for the native lane is 1.228 across the original six kernels
   and 1.117 across all twelve (the WP5 tail run on this
