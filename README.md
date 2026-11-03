@@ -65,26 +65,26 @@ The Krell LLVM rows come from a fourth harness binary built the
 same way; it links the C -O2 references, verifies every checksum
 against them internally, and emits only its own rows.
 
-## Results (2026-11-03, v2.0 branch, WP10 run)
+## Results (2026-11-03, v2.0 branch, WP11 run)
 
 Run on the bench machine: AMD EPYC 9D25, gcc 13.3 -O2, Krell
-v2.0 tree (WP1-WP10). Best per-call nanoseconds from
+v2.0 tree (WP1-WP11). Best per-call nanoseconds from
 `results/results.json`:
 
 | kernel | C -O0 | C -O1 | C -O2 | Krell | Krell LLVM | Krell interp | Python | NumPy |
 |---|---|---|---|---|---|---|---|---|
-| fill32 | 1.23M | 556.7K | 279.0K | 89.3K | 89.2K | 153.34M | 28.45M | 283.6K |
-| span | 23.0K | 13.4K | 12.7K | 9.2K | 9.7K | 1.91M | 2.11M | 78.8K |
-| sumsq | 1.84M | 721.5K | 760.5K | 494.9K | 561.0K | 166.32M | 57.39M | 1.13M |
-| fib | 17.34M | 16.61M | 4.83M | 24.7 | 10.0 | 1380.73M | 395.50M | -- |
-| histo | 6.74M | 2.27M | 2.26M | 2.22M | 2.20M | 759.11M | 178.08M | 18.68M |
-| fnv1a | 8.91M | 8.88M | 8.89M | 8.96M | 8.86M | 739.34M | 523.75M | -- |
-| dot | 1.91M | 762.1K | 762.6K | 808.3K | 733.5K | 199.57M | 80.26M | 1.14M |
-| saxpy | 2.23M | 726.3K | 722.6K | 270.0K | 278.6K | 219.31M | 132.76M | 573.0K |
-| copy | 1.60M | 566.4K | 562.7K | 565.4K | 187.0K | 169.93M | 39.34M | 147.7K |
-| bytesum | 5.19M | 2.23M | 2.22M | 2.22M | 1.11M | 658.86M | 111.51M | 3.41M |
-| parse | 2.34M | 1.07M | 1.04M | 1.06M | 1.01M | 499.65M | 20.58M | -- |
-| mix | 3.45M | 1.86M | 1.85M | 1.87M | 2.57M | 243.87M | 612.59M | 2.82M |
+| fill32 | 1.23M | 555.3K | 279.3K | 87.3K | 86.3K | 149.05M | 29.63M | 305.3K |
+| span | 23.1K | 13.5K | 12.8K | 9.2K | 9.8K | 1.82M | 2.12M | 92.6K |
+| sumsq | 1.84M | 718.6K | 758.8K | 491.4K | 561.2K | 166.37M | 57.51M | 1.25M |
+| fib | 17.45M | 17.03M | 4.85M | 24.7 | 10.0 | 1352.79M | 404.48M | -- |
+| histo | 6.70M | 2.26M | 2.25M | 2.23M | 2.20M | 806.74M | 179.82M | 22.97M |
+| fnv1a | 8.97M | 8.93M | 8.89M | 8.96M | 8.86M | 709.54M | 545.13M | -- |
+| dot | 1.86M | 738.2K | 731.2K | 747.2K | 743.3K | 204.86M | 83.89M | 1.13M |
+| saxpy | 2.24M | 728.2K | 731.3K | 270.3K | 281.5K | 232.91M | 131.06M | 456.4K |
+| copy | 1.62M | 564.7K | 562.7K | 186.5K | 186.4K | 176.22M | 39.82M | 150.1K |
+| bytesum | 5.27M | 2.23M | 2.22M | 2.24M | 1.11M | 692.91M | 108.79M | 3.44M |
+| parse | 2.36M | 1.07M | 1.04M | 978.1K | 1.11M | 487.70M | 19.81M | -- |
+| mix | 3.48M | 1.91M | 1.87M | 1.89M | 2.13M | 249.07M | 610.98M | 2.81M |
 
 ## Reading the results
 
@@ -277,6 +277,37 @@ v2.0 tree (WP1-WP10). Best per-call nanoseconds from
   differential batteries at 4,546 cases with 0 failures,
   and all twelve kernels' checksums in agreement across
   every implementation in the run.
+
+- WP11 teaches the loop vectorizer the pure data-movement
+  shape, in the optimizer (kernels untouched). A two-stream
+  loop whose body is one load and one store of the loaded
+  value -- copy's shape -- previously fell between the
+  existing classes: the map class requires a multiply-add,
+  and the generic scan rejects any body with two pointer
+  computations. The new class rides the map layout (vector
+  steps with a scalar remainder) and emits no arithmetic.
+  copy's native row moves from 1.005 in the WP10 run to
+  0.331 here, level with the LLVM lane's 0.331; a first
+  WP11 run on this host measured 0.297. A companion
+  two-stream reduction class (dot's shape: multiply the
+  two streams, accumulate) is implemented behind a
+  profitability gate: it fires only when the element type
+  has real vector lanes, because the 64-bit form takes
+  the scalar-unroll path, whose unrolled body keeps both
+  pointers and all accumulators live at once and the
+  native allocator spills (an ungated build measured dot
+  at 1.825 native, against 0.556 on the LLVM lane, whose
+  allocator holds the shape). With the gate, dot's code
+  generation is unchanged from WP10 and its rows move
+  only with this host's variance, as do parse's (0.939
+  native here). Geomean S against C -O2: native 10.504
+  across the original six, 3.869 across all twelve
+  (1.445 excluding fib); LLVM 11.906 and 4.263 (1.479
+  excluding fib). Gates: clean build under -Werror, test
+  suite green, x86_64 and LLVM differential batteries at
+  4,546 cases with 0 failures, AArch64 and RISC-V code
+  generation verified, and all twelve kernels' checksums
+  in agreement across every implementation in the run.
 
 The deterministic property no column can show: the Krell rows are
 produced by a total, verified IR whose outputs are byte-identical
