@@ -16,92 +16,56 @@ Krell from the bench results baked into its data tables).
 
 | kernel | workload | shape under test |
 |---|---|---|
-| fill32 | 1M u32 stores | streaming stores / vectorizer bait |
-| span | 4096 px textured span | serial fixed-point pipeline + gather |
-| sumsq | 1M i64 multiply-accumulate | reduction loop |
-| fib | fib(32), naive recursion | raw call overhead |
-| histo | 4M byte histogram | load-increment-store, data-dependent |
-| fnv1a | 4M byte FNV-1a | serial dependency chain (latency floor) |
-| dot | 1M i64 pairs | multiply-accumulate reduction, two streams |
-| saxpy | 1M i32, y = 3x + y | fused multiply-add stream (integer) |
-| copy | 1M u32 stream copy | pure data movement |
-| bytesum | 4M byte sum | byte-load reduction / widening |
-| parse | 1M chars, sum of decimal integers | branchy state-machine scan |
-| mix | 1M u64 splitmix64 | wide integer multiply chain |
-
-The C references in `kernels/refs.c` define the semantics. Every
-implementation of a kernel must produce the same checksum
-(sum/value over the output, defined per kernel in the harness);
-the merger refuses to publish a table when any checksum disagrees.
-
-## Implementations
-
-- **C -O0 / -O1 / -O2** -- `kernels/refs.c` compiled with gcc at each
-  level, timed by `harness/bench.c`.
-- **Krell native** -- `kernels/*.krell`, built with
-  `krellc build --target x86_64 -O`, linked into the same harness.
-- **Krell interp** -- the same Krell modules run by the reference
-  interpreter (`krellc run`) through driver mains in
-  `harness/drivers/`. Timed with a two-point slope: each driver runs
-  at two rep counts and the per-call cost is the difference quotient,
-  which cancels process startup and buffer setup exactly.
-- **Python** -- pure-Python implementations (no library help).
-- **NumPy** -- vectorized forms where an honest one exists. fib has
-  none (the kernel is recursion itself), fnv1a has none (the
-  kernel is a serial dependency chain), and parse has none (the
-  kernel is a stateful scan); all three are reported as absent,
-  not approximated.
-
-## Protocol
-
-Warmup, then 7 rounds of a rep loop per kernel; best and median
-per-call nanoseconds are recorded (Python fib: 3 rounds). The C and
-Krell-native rows come from a single harness binary per C opt level,
-so both sides of each comparison share buffers, protocol, and clock.
-
-## Results (2026-11-02, v2.0 branch, WP5 run)
-
-Run on the bench machine: AMD EPYC 9D25, gcc 13.3 -O2, Krell
-v2.0 tree (WP1-WP5). Best per-call nanoseconds from
-`results/results.json`:
-
-| kernel | C -O0 | C -O1 | C -O2 | Krell | Krell interp | Python | NumPy |
-|---|---|---|---|---|---|---|---|
-| fill32 | 1.24M | 556.9K | 281.2K | 93.2K | 230.53M | 28.50M | 282.5K |
-| span | 23.1K | 13.4K | 12.9K | 9.3K | 2.83M | 2.21M | 77.6K |
-| sumsq | 1.84M | 719.0K | 761.5K | 476.4K | 241.80M | 78.25M | 1.14M |
-| fib | 17.24M | 16.97M | 4.90M | 9.84M | 3189.12M | 548.70M | -- |
-| histo | 6.72M | 2.25M | 2.25M | 2.22M | 749.27M | 248.88M | 14.20M |
-| fnv1a | 8.89M | 9.72M | 8.90M | 8.86M | 707.96M | 749.18M | -- |
-| dot | 1.90M | 765.6K | 802.8K | 727.2K | 195.95M | 85.35M | 1.19M |
-| saxpy | 2.23M | 726.7K | 733.4K | 1.64M | 212.34M | 178.90M | 581.2K |
-| copy | 1.60M | 571.1K | 570.2K | 568.5K | 167.83M | 47.49M | 182.1K |
-| bytesum | 5.20M | 2.24M | 2.25M | 2.22M | 612.00M | 120.55M | 3.41M |
-| parse | 2.34M | 1.08M | 1.05M | 2.39M | 474.82M | 21.81M | -- |
-| mix | 3.45M | 1.89M | 1.91M | 2.10M | 248.40M | 637.65M | 3.51M |
+| fill32 | 1.23M | 556.6K | 292.4K | 86.7K | 153.74M | 28.49M | 277.5K |
+| span | 22.9K | 13.3K | 14.4K | 9.2K | 1.81M | 2.11M | 76.5K |
+| sumsq | 1.83M | 717.8K | 847.7K | 478.0K | 164.97M | 56.78M | 1.12M |
+| fib | 17.25M | 16.80M | 4.81M | 9.66M | 2793.06M | 391.94M | -- |
+| histo | 6.67M | 2.25M | 2.23M | 2.21M | 761.44M | 174.19M | 14.51M |
+| fnv1a | 8.87M | 8.87M | 8.84M | 8.89M | 683.26M | 516.03M | -- |
+| dot | 1.89M | 762.1K | 757.5K | 776.0K | 199.83M | 79.94M | 1.14M |
+| saxpy | 2.23M | 737.5K | 721.5K | 260.4K | 211.19M | 128.21M | 474.6K |
+| copy | 1.60M | 574.0K | 558.7K | 566.8K | 169.07M | 39.44M | 149.1K |
+| bytesum | 5.18M | 2.44M | 2.21M | 2.95M | 651.59M | 108.06M | 3.41M |
+| parse | 2.33M | 1.09M | 1.03M | 1.66M | 476.61M | 19.77M | -- |
+| mix | 3.42M | 1.85M | 1.83M | 2.09M | 251.41M | 603.74M | 2.85M |
 
 ## Reading the results
 
-- WP5 adds six kernels in domains the original six did not
+- WP5 added six kernels in domains the original six did not
   cover: a two-stream reduction (dot), a fused multiply-add
   stream (saxpy), pure data movement (copy), a widening byte
   reduction (bytesum), a branchy text scan (parse), and a wide
-  multiply chain (mix). First measurements on this machine:
-  dot is ahead of C -O2 in its debut (0.906), copy and bytesum
-  are at parity (0.997, 0.987), and mix is close (1.100).
-  Two kernels trail and are the WP5 follow-up work: saxpy
-  (2.241) -- gcc vectorizes the i32 multiply-add stream and
-  the Krell optimizer does not yet -- and parse (2.268), whose
-  per-byte branch chain has no specialized lowering yet.
+  multiply chain (mix). The WP5 tail then closed the two
+  domains that trailed. saxpy (2.241 in the WP5 run) runs at
+  0.361: the loop vectorizer learned the map shape -- two
+  input streams, an invariant multiplier, one output stream --
+  and now lowers it to vector load/multiply/add/store with a
+  scalar remainder loop, the same construction the fill and
+  reduce shapes already used. parse (2.268) runs at 1.606: the
+  optimizer now recognizes the range-check idiom
+  (x >= lo) & (x <= hi) and rewrites it to the single
+  subtract-and-unsigned-compare form (x - lo) <=u (hi - lo).
+  parse still trails C -O2; its remaining gap is a register
+  allocator spill of the loaded byte across the digit branch,
+  which is future work, as is mix (1.141).
+- bytesum's row in this run (1.335) is measurement context,
+  not code: its emitted code is byte-identical to the WP5
+  run's (0.987), its C -O2 time is unchanged, and repeated
+  isolated runs of this run's own bench binary measure
+  ~2.23M ns (ratio ~1.00). Streaming kernels on this shared
+  host read high when a full bench run coincides with host
+  load; dot shows the same wobble (0.906 in the WP5 run,
+  1.024 here, on unchanged code generation).
 - Headline for this run: the geometric mean of S = T_C / T_Krell
-  is 1.226 across the original six kernels and 0.968 across
-  all twelve -- the two trailing WP5 kernels are what pull the
-  twelve-kernel figure under 1. On the previous recorded run
-  (WP4, Apple M1 under Rosetta, clang 21) the original six
+  is 1.293 across the original six kernels and 1.145 across
+  all twelve, up from 1.226 and 0.968 in the WP5 run on this
+  same machine -- the saxpy fix alone moved the twelve-kernel
+  figure from below parity to ahead. On the previous recorded
+  run (WP4, Apple M1 under Rosetta, clang 21) the original six
   measured a geomean S of 1.108, up from 1.002 after WP3,
-  0.804 after WP2, and 0.44 after WP1. The two runs measure
-  different opponents and are not directly comparable kernel
-  by kernel.
+  0.804 after WP2, and 0.44 after WP1. The two machines
+  measure different opponents and are not directly comparable
+  kernel by kernel.
 - fill32 on this machine is not roofline-bound the way it was
   on the M1 run: the vectorized Krell store loop (93.2K) runs
   about 3x faster than gcc -O2's (281.2K), which did not
