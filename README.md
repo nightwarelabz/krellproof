@@ -65,26 +65,26 @@ The Krell LLVM rows come from a fourth harness binary built the
 same way; it links the C -O2 references, verifies every checksum
 against them internally, and emits only its own rows.
 
-## Results (2026-11-03, v2.0 branch, WP9 run)
+## Results (2026-11-03, v2.0 branch, WP10 run)
 
 Run on the bench machine: AMD EPYC 9D25, gcc 13.3 -O2, Krell
-v2.0 tree (WP1-WP9). Best per-call nanoseconds from
+v2.0 tree (WP1-WP10). Best per-call nanoseconds from
 `results/results.json`:
 
 | kernel | C -O0 | C -O1 | C -O2 | Krell | Krell LLVM | Krell interp | Python | NumPy |
 |---|---|---|---|---|---|---|---|---|
-| fill32 | 1.24M | 559.0K | 282.2K | 87.2K | 89.2K | 160.60M | 28.77M | 277.9K |
-| span | 23.2K | 13.4K | 13.0K | 9.6K | 9.7K | 1.80M | 2.12M | 76.0K |
-| sumsq | 1.85M | 721.0K | 763.2K | 495.5K | 559.6K | 163.58M | 57.41M | 1.12M |
-| fib | 17.42M | 17.18M | 4.89M | 36.7 | 10.0 | 1416.29M | 407.58M | -- |
-| histo | 6.77M | 2.29M | 2.27M | 2.23M | 2.20M | 778.83M | 178.26M | 14.01M |
-| fnv1a | 9.01M | 8.96M | 9.01M | 8.98M | 8.89M | 660.08M | 522.69M | -- |
-| dot | 1.95M | 766.5K | 775.5K | 787.8K | 730.5K | 211.79M | 81.24M | 1.14M |
-| saxpy | 2.25M | 722.5K | 734.8K | 268.8K | 277.4K | 225.75M | 132.51M | 478.1K |
-| copy | 1.61M | 567.2K | 573.7K | 565.1K | 185.0K | 167.01M | 39.19M | 151.1K |
-| bytesum | 5.25M | 2.23M | 2.25M | 2.24M | 1.11M | 676.31M | 110.15M | 3.41M |
-| parse | 2.36M | 1.08M | 1.05M | 1.12M | 1.01M | 479.25M | 20.54M | -- |
-| mix | 3.43M | 1.87M | 1.88M | 1.85M | 2.32M | 238.89M | 627.57M | 2.82M |
+| fill32 | 1.23M | 556.7K | 279.0K | 89.3K | 89.2K | 153.34M | 28.45M | 283.6K |
+| span | 23.0K | 13.4K | 12.7K | 9.2K | 9.7K | 1.91M | 2.11M | 78.8K |
+| sumsq | 1.84M | 721.5K | 760.5K | 494.9K | 561.0K | 166.32M | 57.39M | 1.13M |
+| fib | 17.34M | 16.61M | 4.83M | 24.7 | 10.0 | 1380.73M | 395.50M | -- |
+| histo | 6.74M | 2.27M | 2.26M | 2.22M | 2.20M | 759.11M | 178.08M | 18.68M |
+| fnv1a | 8.91M | 8.88M | 8.89M | 8.96M | 8.86M | 739.34M | 523.75M | -- |
+| dot | 1.91M | 762.1K | 762.6K | 808.3K | 733.5K | 199.57M | 80.26M | 1.14M |
+| saxpy | 2.23M | 726.3K | 722.6K | 270.0K | 278.6K | 219.31M | 132.76M | 573.0K |
+| copy | 1.60M | 566.4K | 562.7K | 565.4K | 187.0K | 169.93M | 39.34M | 147.7K |
+| bytesum | 5.19M | 2.23M | 2.22M | 2.22M | 1.11M | 658.86M | 111.51M | 3.41M |
+| parse | 2.34M | 1.07M | 1.04M | 1.06M | 1.01M | 499.65M | 20.58M | -- |
+| mix | 3.45M | 1.86M | 1.85M | 1.87M | 2.57M | 243.87M | 612.59M | 2.82M |
 
 ## Reading the results
 
@@ -246,6 +246,33 @@ v2.0 tree (WP1-WP9). Best per-call nanoseconds from
   row; excluding fib, the eleven remaining kernels
   measure 1.300 native and 1.504 LLVM, at their WP8
   levels within this host's variance. Gates: clean build
+  under -Werror, test suite green, x86_64 and LLVM
+  differential batteries at 4,546 cases with 0 failures,
+  and all twelve kernels' checksums in agreement across
+  every implementation in the run.
+
+- WP10 removes the edge move from loop-carried updates,
+  in the register allocator (shared backend kit, kernels
+  untouched). A value whose only use is as the branch
+  argument for a block parameter is now computed directly
+  into that parameter's register when the parameter has
+  no later use in the source block -- the accumulator and
+  index updates of a loop body land in place instead of
+  in a fresh register plus a copy on the back edge. The
+  coalesced register is protected from eviction, and at
+  most one value per block and register coalesces. parse,
+  the kernel built from such updates, improves from
+  1.068 in the WP9 run to 1.023 here, and in an
+  interleaved A/B of the WP9 and WP10 bench binaries it
+  measures at parity with C -O2 (1.041M ns against
+  1.040M). fib's loop narrows further, 36.7 to 24.7 ns.
+  dot's loop body is shorter by the same change but
+  measures 1.060 here: its cost is the accumulator
+  dependency chain, not the removed move, and the row
+  moves with code layout on this host. Geomean S against
+  C -O2: native 10.457 across the original six, 3.483
+  across all twelve (1.289 excluding fib); LLVM 11.842
+  and 4.231 (1.468 excluding fib). Gates: clean build
   under -Werror, test suite green, x86_64 and LLVM
   differential batteries at 4,546 cases with 0 failures,
   and all twelve kernels' checksums in agreement across
