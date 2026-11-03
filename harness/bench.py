@@ -348,6 +348,7 @@ def merge():
     all_rows = []
     for name in ("raw_c_o0.jsonl", "raw_c_o1.jsonl", "raw_c_o2.jsonl"):
         all_rows += load_jsonl(name)
+    all_rows += load_jsonl("raw_krell_llvm.jsonl")
     all_rows += load_jsonl("raw_python.jsonl")
     all_rows += load_jsonl("raw_interp.jsonl")
 
@@ -398,7 +399,7 @@ def merge():
     with open(os.path.join(RESULTS, "results.json"), "w") as fh:
         json.dump(out, fh, indent=1)
     print("\n=== ratios vs C -O2 (best ns; >1 = slower than C -O2) ===")
-    impls_all = ["c_o0", "c_o1", "c_o2", "krell", "krell_interp", "python", "numpy"]
+    impls_all = ["c_o0", "c_o1", "c_o2", "krell", "krell_llvm", "krell_interp", "python", "numpy"]
     print(f"{'kernel':9s}" + "".join(f"{i:>14s}" for i in impls_all))
     for kernel in ("fill32", "span", "sumsq", "fib", "histo", "fnv1a",
                    "dot", "saxpy", "copy", "bytesum", "parse", "mix"):

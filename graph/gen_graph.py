@@ -14,7 +14,7 @@ import re
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
-W, H = 1760, 2400
+W, H = 1760, 2640
 
 # ------------------------------------------------------------------- font
 FONT = {
@@ -89,11 +89,12 @@ HEADERS = {
     "parse": "PARSE - 1M CHARS", "mix": "MIX - 1M U64 SPLITMIX",
 }
 IMPLS = [("c_o0", "C -O0"), ("c_o1", "C -O1"), ("c_o2", "C -O2"),
-         ("krell", "KRELL"), ("krell_interp", "INTERP"),
+         ("krell", "KRELL"), ("krell_llvm", "LLVM"),
+         ("krell_interp", "INTERP"),
          ("python", "PYTHON"), ("numpy", "NUMPY")]
 IMPL_IDX = {name: i for i, (name, _) in enumerate(IMPLS)}
 PAL_BAR = [(88, 99, 122), (118, 133, 158), (165, 185, 210), (55, 215, 255),
-           (35, 120, 140), (238, 185, 55), (120, 200, 90)]
+           (170, 120, 255), (35, 120, 140), (238, 185, 55), (120, 200, 90)]
 PAL_TXT = [(235, 240, 248), (150, 165, 190), (90, 220, 255),
            (200, 214, 232), (140, 155, 175)] + PAL_BAR
 TXT_WHITE, TXT_DIM, TXT_CYAN, TXT_HEAD, TXT_FOOT = 0, 1, 2, 3, 4
@@ -102,7 +103,7 @@ TXT_IMPL0 = 5  # impl label colors follow the bar palette
 LOG_LO, LOG_HI = 4.0, 9.6
 BAR_X_OFF, BAR_MAXLEN = 128, 500
 ROW0_OFF, ROW_PITCH, BAR_H = 56, 40, 24
-PANEL_W, PANEL_H = 820, 340
+PANEL_W, PANEL_H = 820, 380
 
 
 def fmt_ns(v):
@@ -132,12 +133,12 @@ def pack(r, g, b):
 strings.append(("KRELLPROOF", 40, 28, 7, TXT_WHITE))
 strings.append(("ASSAULT BENCH - NS PER CALL (LOG SCALE) - LOWER IS FASTER",
                 42, 102, 3, TXT_CYAN))
-strings.append(("KRELL NATIVE AND INTERPRETER VS C -O0 -O1 -O2 VS PYTHON AND NUMPY",
+strings.append(("KRELL NATIVE AND LLVM VS C -O0 -O1 -O2 VS PYTHON AND NUMPY",
                 42, 140, 2, TXT_DIM))
 
 for ki, kernel in enumerate(KERNELS):
     px = 40 + (ki % 2) * 860
-    py = 176 + (ki // 2) * 360
+    py = 176 + (ki // 2) * 400
     panels.append((px, py, px + PANEL_W, py + PANEL_H,
                    pack(14, 20, 36), pack(44, 62, 94)))
     strings.append((HEADERS[kernel], px + 16, py + 14, 3, TXT_HEAD))
@@ -169,7 +170,7 @@ date_short = meta.get("date", "")[:10]
 strings.append((
     f"{cpu_short} - {gcc_short} - PYTHON {meta.get('python', '')} - "
     f"NUMPY {meta.get('numpy', '')} - KRELL V1.1 - {date_short} - "
-    f"ALL CHECKSUMS IDENTICAL", 40, 2364, 2, TXT_FOOT))
+    f"ALL CHECKSUMS IDENTICAL", 40, 2588, 2, TXT_FOOT))
 
 GRID_OFFS = [round((d - LOG_LO) / (LOG_HI - LOG_LO) * BAR_MAXLEN)
              for d in (5, 6, 7, 8, 9)]

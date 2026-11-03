@@ -16,6 +16,9 @@
 #ifndef IMPL_NAME
 #define IMPL_NAME "c"
 #endif
+#ifndef KRELL_IMPL_NAME
+#define KRELL_IMPL_NAME "krell"
+#endif
 
 /* C references (kernels/refs.c) */
 void ref_fill32(uint32_t *, int64_t, uint32_t);
@@ -72,6 +75,9 @@ static double bench(run_fn fn, void *ctx, int reps, double *median_out) {
 
 static void emit(const char *kernel, const char *impl, double best, double median,
                  unsigned long long checksum) {
+#ifdef KRELL_ONLY
+    if (strcmp(impl, IMPL_NAME) == 0) return;
+#endif
     printf("{\"kernel\":\"%s\",\"impl\":\"%s\",\"best_ns\":%.1f,\"median_ns\":%.1f,"
            "\"checksum\":%llu}\n", kernel, impl, best, median, checksum);
     fflush(stdout);
@@ -287,7 +293,7 @@ int main(void) {
         double bc = bench(run_fill_c, NULL, 20, &med), mc = med;
         double bk = bench(run_fill_k, NULL, 20, &med), mk = med;
         emit("fill32", IMPL_NAME, bc, mc, cs);
-        emit("fill32", "krell", bk, mk, cs);
+        emit("fill32", KRELL_IMPL_NAME, bk, mk, cs);
     }
     /* span */
     ref_span(span_a, span_tex, SPAN_W, 3 << 16, 5 << 16, 70000, -30000, 200);
@@ -298,7 +304,7 @@ int main(void) {
         double bc = bench(run_span_c, NULL, 200, &med), mc = med;
         double bk = bench(run_span_k, NULL, 200, &med), mk = med;
         emit("span", IMPL_NAME, bc, mc, cs);
-        emit("span", "krell", bk, mk, cs);
+        emit("span", KRELL_IMPL_NAME, bk, mk, cs);
     }
     /* sumsq */
     {
@@ -307,7 +313,7 @@ int main(void) {
         { double bc = bench(run_sumsq_c, NULL, 20, &med), mc = med;
           double bk = bench(run_sumsq_k, NULL, 20, &med), mk = med;
           emit("sumsq", IMPL_NAME, bc, mc, (unsigned long long)rc);
-          emit("sumsq", "krell", bk, mk, (unsigned long long)rk); }
+          emit("sumsq", KRELL_IMPL_NAME, bk, mk, (unsigned long long)rk); }
     }
     /* fib */
     {
@@ -316,7 +322,7 @@ int main(void) {
         { double bc = bench(run_fib_c, NULL, 15, &med), mc = med;
           double bk = bench(run_fib_k, NULL, 15, &med), mk = med;
           emit("fib", IMPL_NAME, bc, mc, (unsigned long long)rc);
-          emit("fib", "krell", bk, mk, (unsigned long long)rk); }
+          emit("fib", KRELL_IMPL_NAME, bk, mk, (unsigned long long)rk); }
     }
     /* histo */
     memset(hist_a, 0, sizeof hist_a);
@@ -329,7 +335,7 @@ int main(void) {
         double bc = bench(run_histo_c, NULL, 5, &med), mc = med;
         double bk = bench(run_histo_k, NULL, 5, &med), mk = med;
         emit("histo", IMPL_NAME, bc, mc, cs);
-        emit("histo", "krell", bk, mk, cs);
+        emit("histo", KRELL_IMPL_NAME, bk, mk, cs);
     }
     /* fnv1a */
     {
@@ -339,7 +345,7 @@ int main(void) {
         { double bc = bench(run_fnv_c, NULL, 5, &med), mc = med;
           double bk = bench(run_fnv_k, NULL, 5, &med), mk = med;
           emit("fnv1a", IMPL_NAME, bc, mc, (unsigned long long)rc);
-          emit("fnv1a", "krell", bk, mk, (unsigned long long)rk); }
+          emit("fnv1a", KRELL_IMPL_NAME, bk, mk, (unsigned long long)rk); }
     }
     /* dot */
     {
@@ -348,7 +354,7 @@ int main(void) {
         { double bc = bench(run_dot_c, NULL, 20, &med), mc = med;
           double bk = bench(run_dot_k, NULL, 20, &med), mk = med;
           emit("dot", IMPL_NAME, bc, mc, (unsigned long long)rc);
-          emit("dot", "krell", bk, mk, (unsigned long long)rk); }
+          emit("dot", KRELL_IMPL_NAME, bk, mk, (unsigned long long)rk); }
     }
     /* saxpy: checksum is the output after exactly one application */
     ref_saxpy(sax_ya, sax_x, STREAM_N, 3);
@@ -359,7 +365,7 @@ int main(void) {
         double bc = bench(run_saxpy_c, NULL, 20, &med), mc = med;
         double bk = bench(run_saxpy_k, NULL, 20, &med), mk = med;
         emit("saxpy", IMPL_NAME, bc, mc, cs);
-        emit("saxpy", "krell", bk, mk, cs);
+        emit("saxpy", KRELL_IMPL_NAME, bk, mk, cs);
     }
     /* copy */
     ref_copy(copy_da, copy_src, STREAM_N);
@@ -370,7 +376,7 @@ int main(void) {
         double bc = bench(run_copy_c, NULL, 20, &med), mc = med;
         double bk = bench(run_copy_k, NULL, 20, &med), mk = med;
         emit("copy", IMPL_NAME, bc, mc, cs);
-        emit("copy", "krell", bk, mk, cs);
+        emit("copy", KRELL_IMPL_NAME, bk, mk, cs);
     }
     /* bytesum */
     {
@@ -380,7 +386,7 @@ int main(void) {
         { double bc = bench(run_bytesum_c, NULL, 5, &med), mc = med;
           double bk = bench(run_bytesum_k, NULL, 5, &med), mk = med;
           emit("bytesum", IMPL_NAME, bc, mc, (unsigned long long)rc);
-          emit("bytesum", "krell", bk, mk, (unsigned long long)rk); }
+          emit("bytesum", KRELL_IMPL_NAME, bk, mk, (unsigned long long)rk); }
     }
     /* parse */
     {
@@ -389,7 +395,7 @@ int main(void) {
         { double bc = bench(run_parse_c, NULL, 10, &med), mc = med;
           double bk = bench(run_parse_k, NULL, 10, &med), mk = med;
           emit("parse", IMPL_NAME, bc, mc, (unsigned long long)rc);
-          emit("parse", "krell", bk, mk, (unsigned long long)rk); }
+          emit("parse", KRELL_IMPL_NAME, bk, mk, (unsigned long long)rk); }
     }
     /* mix */
     ref_mix(mix_da, mix_src, STREAM_N);
@@ -400,7 +406,7 @@ int main(void) {
         double bc = bench(run_mix_c, NULL, 20, &med), mc = med;
         double bk = bench(run_mix_k, NULL, 20, &med), mk = med;
         emit("mix", IMPL_NAME, bc, mc, cs);
-        emit("mix", "krell", bk, mk, cs);
+        emit("mix", KRELL_IMPL_NAME, bk, mk, cs);
     }
     return 0;
 }

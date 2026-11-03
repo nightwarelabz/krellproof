@@ -1,0 +1,12 @@
+{"kernel":"fill32","impl":"krell_llvm","best_ns":86321.4,"median_ns":87539.3,"checksum":320255972868096}
+{"kernel":"span","impl":"krell_llvm","best_ns":9788.5,"median_ns":9845.9,"checksum":28299366513}
+{"kernel":"sumsq","impl":"krell_llvm","best_ns":562554.4,"median_ns":567882.3,"checksum":384307717958270976}
+{"kernel":"fib","impl":"krell_llvm","best_ns":9604553.4,"median_ns":9645712.5,"checksum":2178309}
+{"kernel":"histo","impl":"krell_llvm","best_ns":2213001.4,"median_ns":2224344.4,"checksum":538969024}
+{"kernel":"fnv1a","impl":"krell_llvm","best_ns":8916322.4,"median_ns":8959631.4,"checksum":3462303757254121957}
+{"kernel":"dot","impl":"krell_llvm","best_ns":835596.9,"median_ns":993295.5,"checksum":3298535931902}
+{"kernel":"saxpy","impl":"krell_llvm","best_ns":288025.5,"median_ns":291383.0,"checksum":1649272160254}
+{"kernel":"copy","impl":"krell_llvm","best_ns":185341.5,"median_ns":187238.3,"checksum":8796079030272}
+{"kernel":"bytesum","impl":"krell_llvm","best_ns":1118824.2,"median_ns":1174802.2,"checksum":534774720}
+{"kernel":"parse","impl":"krell_llvm","best_ns":1020964.5,"median_ns":1028631.0,"checksum":161817165824}
+{"kernel":"mix","impl":"krell_llvm","best_ns":2136900.9,"median_ns":2256550.3,"checksum":14583257995973114678}
