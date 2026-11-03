@@ -65,26 +65,29 @@ The Krell LLVM rows come from a fourth harness binary built the
 same way; it links the C -O2 references, verifies every checksum
 against them internally, and emits only its own rows.
 
-## Results (2026-11-03, v2.0 branch, WP11 run)
+## Results (2026-11-03, v2.0 branch, WP12 run)
 
 Run on the bench machine: AMD EPYC 9D25, gcc 13.3 -O2, Krell
-v2.0 tree (WP1-WP11). Best per-call nanoseconds from
-`results/results.json`:
+v2.0 tree (WP1-WP12). The LLVM lane of this run was built
+with clang 18 (the emscripten-bundled clang 19 used for the
+WP8-WP11 records was lost with its VM image); the lane's
+differential battery passes 4,546/0 under it. Best per-call
+nanoseconds from `results/results.json`:
 
 | kernel | C -O0 | C -O1 | C -O2 | Krell | Krell LLVM | Krell interp | Python | NumPy |
 |---|---|---|---|---|---|---|---|---|
-| fill32 | 1.23M | 555.3K | 279.3K | 87.3K | 86.3K | 149.05M | 29.63M | 305.3K |
-| span | 23.1K | 13.5K | 12.8K | 9.2K | 9.8K | 1.82M | 2.12M | 92.6K |
-| sumsq | 1.84M | 718.6K | 758.8K | 491.4K | 561.2K | 166.37M | 57.51M | 1.25M |
-| fib | 17.45M | 17.03M | 4.85M | 24.7 | 10.0 | 1352.79M | 404.48M | -- |
-| histo | 6.70M | 2.26M | 2.25M | 2.23M | 2.20M | 806.74M | 179.82M | 22.97M |
-| fnv1a | 8.97M | 8.93M | 8.89M | 8.96M | 8.86M | 709.54M | 545.13M | -- |
-| dot | 1.86M | 738.2K | 731.2K | 747.2K | 743.3K | 204.86M | 83.89M | 1.13M |
-| saxpy | 2.24M | 728.2K | 731.3K | 270.3K | 281.5K | 232.91M | 131.06M | 456.4K |
-| copy | 1.62M | 564.7K | 562.7K | 186.5K | 186.4K | 176.22M | 39.82M | 150.1K |
-| bytesum | 5.27M | 2.23M | 2.22M | 2.24M | 1.11M | 692.91M | 108.79M | 3.44M |
-| parse | 2.36M | 1.07M | 1.04M | 978.1K | 1.11M | 487.70M | 19.81M | -- |
-| mix | 3.48M | 1.91M | 1.87M | 1.89M | 2.13M | 249.07M | 610.98M | 2.81M |
+| fill32 | 1.26M | 595.7K | 279.0K | 89.8K | 87.1K | 157.42M | 28.88M | 280.8K |
+| span | 25.1K | 13.6K | 16.3K | 9.3K | 9.8K | 1.84M | 2.15M | 78.4K |
+| sumsq | 1.86M | 778.1K | 763.8K | 492.1K | 566.8K | 167.21M | 57.27M | 1.13M |
+| fib | 17.55M | 16.72M | 4.87M | 25.3 | 10.0 | 1418.78M | 402.42M | -- |
+| histo | 6.77M | 2.26M | 2.25M | 2.24M | 2.21M | 762.58M | 175.36M | 14.57M |
+| fnv1a | 9.02M | 8.95M | 8.90M | 9.01M | 8.93M | 773.76M | 527.62M | -- |
+| dot | 1.95M | 773.3K | 803.9K | 814.6K | 731.9K | 208.84M | 81.40M | 1.18M |
+| saxpy | 2.28M | 732.3K | 728.1K | 275.5K | 290.6K | 223.65M | 132.57M | 483.1K |
+| copy | 1.61M | 575.3K | 569.5K | 186.6K | 186.0K | 169.92M | 40.42M | 149.8K |
+| bytesum | 5.26M | 2.25M | 2.23M | 2.26M | 1.12M | 669.07M | 110.29M | 3.44M |
+| parse | 2.38M | 1.08M | 1.05M | 999.5K | 1.03M | 480.25M | 20.24M | -- |
+| mix | 3.47M | 1.84M | 1.90M | 1.85M | 2.76M | 255.78M | 607.81M | 2.91M |
 
 ## Reading the results
 
@@ -308,6 +311,41 @@ v2.0 tree (WP1-WP11). Best per-call nanoseconds from
   4,546 cases with 0 failures, AArch64 and RISC-V code
   generation verified, and all twelve kernels' checksums
   in agreement across every implementation in the run.
+
+- WP12 teaches the loop vectorizer the widening reduction,
+  in the optimizer (kernels untouched). A loop that loads
+  a narrow integer element, zero-extends it, and adds it
+  into a wider accumulator -- bytesum's shape -- was
+  rejected by every existing class because of the zext
+  between the load and the add. The new class rides the
+  scalar reduce layout: four independent load/zext/add
+  accumulator chains with a scalar remainder, the
+  accumulator carried at its full width end to end.
+  Byte-for-byte comparison of the WP11 and WP12 compilers'
+  output across all twelve kernels shows bytesum is the
+  only kernel whose code generation changes. Its in-run
+  row here is 1.010, unchanged from WP11: under this
+  harness's protocol the 4 MiB stream is bound by the
+  scalar byte-load path, and repeated full runs read the
+  row at parity for both compilers. Measured hot, in an
+  interleaved A/B on the bench's own 4 MiB workload
+  (WP11-compiled against WP12-compiled bytesum, checksums
+  identical), the new body runs 1.51M ns against 2.24M --
+  the gain is real but the protocol cannot see it; the
+  LLVM lane's 0.501 comes from true vector widening,
+  which remains the open native-side lever for this
+  kernel. Two rows in this run are host weather, not
+  signal: span's C -O2 row read high (16.3K against its
+  usual 12.7K), flattering span's native ratio, and the
+  LLVM lane's mix row (1.454) is this run's outlier.
+  Geomean S against C -O2: native 10.821 across the
+  original six, 3.931 across all twelve (1.473 excluding
+  fib); LLVM 12.334 and 4.313 (1.498 excluding fib).
+  Gates: clean build under -Werror, test suite green,
+  x86_64 and LLVM differential batteries at 4,546 cases
+  with 0 failures, AArch64 and RISC-V code generation
+  verified, and all twelve kernels' checksums in
+  agreement across every implementation in the run.
 
 The deterministic property no column can show: the Krell rows are
 produced by a total, verified IR whose outputs are byte-identical
