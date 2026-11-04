@@ -12,6 +12,8 @@ Krell from the bench results baked into its data tables).
 
 ![KRELLPROOF results](graph/graph.png)
 
+![Krell WP18 speed vs C](graph/krell-wp18-speed-vs-fast-languages.png)
+
 ## Kernels
 
 | kernel | workload | shape under test |
