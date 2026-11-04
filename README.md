@@ -65,14 +65,72 @@ The Krell LLVM rows come from a fourth harness binary built the
 same way; it links the C -O2 references, verifies every checksum
 against them internally, and emits only its own rows.
 
-## Results (2026-11-03, v2.0 branch, WP17 run)
+## Results (2026-11-04, WP18 run)
 
 Run on the bench machine: AMD EPYC 9D25, gcc 13.3 -O2, Krell
-v2.0 tree (WP1-WP17). The LLVM lane of this run was built
-with clang 18 (the emscripten-bundled clang 19 used for the
-WP8-WP11 records was lost with its VM image); the lane's
-differential battery passes 4,546/0 under it. Best per-call
-nanoseconds from `results/results.json`:
+main tree (v3.0 + WP18). The LLVM lane of this run was built
+with clang 18; the lane's differential battery passes
+4,662/0 under it. Best per-call nanoseconds from
+`results/results.json`:
+
+| kernel | C -O0 | C -O1 | C -O2 | Krell | Krell LLVM | Krell interp | Python | NumPy |
+|---|---|---|---|---|---|---|---|---|
+| fill32 | 1.24M | 556.4K | 278.0K | 88.8K | 88.2K | 246.58M | 37.14M | 335.7K |
+| span | 23.8K | 13.4K | 12.8K | 7.5K | 9.3K | 2.49M | 2.63M | 82.1K |
+| sumsq | 1.86M | 723.0K | 761.3K | 390.2K | 423.9K | 257.88M | 76.34M | 1.51M |
+| fib | 23.53M | 22.78M | 6.44M | 22.7 | 10 | 2360.46M | 557.71M | -- |
+| histo | 6.83M | 2.29M | 2.25M | 2.25M | 2.23M | 1181.88M | 245.51M | 32.21M |
+| fnv1a | 8.94M | 8.93M | 8.91M | 8.88M | 8.95M | 972.18M | 747.28M | -- |
+| dot | 1.90M | 759.1K | 765.9K | 593.8K | 427.7K | 391.89M | 114.55M | 1.22M |
+| saxpy | 2.26M | 724.1K | 725.3K | 200.0K | 410.8K | 303.14M | 179.57M | 470.5K |
+| copy | 1.61M | 570.8K | 570.7K | 155.6K | 319.1K | 235.96M | 47.97M | 148.0K |
+| bytesum | 5.21M | 2.22M | 2.23M | 655.7K | 602.8K | 925.59M | 166.77M | 3.43M |
+| parse | 2.36M | 1.07M | 1.05M | 986.2K | 1.02M | 507.14M | 20.22M | -- |
+| mix | 4.75M | 2.00M | 1.92M | 1.80M | 1.95M | 338.90M | 886.35M | 2.76M |
+
+The C references in `kernels/refs.c` define the semantics. Every
+implementation of a kernel must produce the same checksum
+(sum/value over the output, defined per kernel in the harness);
+the merger refuses to publish a table when any checksum disagrees.
+
+## Implementations
+
+- **C -O0 / -O1 / -O2** -- `kernels/refs.c` compiled with gcc at each
+  level, timed by `harness/bench.c`.
+- **Krell native** -- `kernels/*.krell`, built with
+  `krellc build --target x86_64 -O`, linked into the same harness.
+- **Krell LLVM** -- the same Krell modules lowered to LLVM IR
+  (`krellc build --target llvm -O`) and compiled with clang -O2,
+  timed by the same harness (added in WP6).
+- **Krell interp** -- the same Krell modules run by the reference
+  interpreter (`krellc run`) through driver mains in
+  `harness/drivers/`. Timed with a two-point slope: each driver runs
+  at two rep counts and the per-call cost is the difference quotient,
+  which cancels process startup and buffer setup exactly.
+- **Python** -- pure-Python implementations (no library help).
+- **NumPy** -- vectorized forms where an honest one exists. fib has
+  none (the kernel is recursion itself), fnv1a has none (the
+  kernel is a serial dependency chain), and parse has none (the
+  kernel is a stateful scan); all three are reported as absent,
+  not approximated.
+
+## Protocol
+
+Warmup, then 7 rounds of a rep loop per kernel; best and median
+per-call nanoseconds are recorded (Python fib: 3 rounds). The C and
+Krell-native rows come from a single harness binary per C opt level,
+so both sides of each comparison share buffers, protocol, and clock.
+The Krell LLVM rows come from a fourth harness binary built the
+same way; it links the C -O2 references, verifies every checksum
+against them internally, and emits only its own rows.
+
+## Results (2026-11-04, WP18 run)
+
+Run on the bench machine: AMD EPYC 9D25, gcc 13.3 -O2, Krell
+main tree (v3.0 + WP18). The LLVM lane of this run was built
+with clang 18; the lane's differential battery passes
+4,662/0 under it. Best per-call nanoseconds from
+`results/results.json`:
 
 | kernel | C -O0 | C -O1 | C -O2 | Krell | Krell LLVM | Krell interp | Python | NumPy |
 |---|---|---|---|---|---|---|---|---|
@@ -557,6 +615,39 @@ nanoseconds from `results/results.json`:
   test suite green, all four differential batteries at
   4,546 cases with 0 failures, fuzz clean on x86_64
   seeds 1-3 (opt), and all twelve kernels' checksums in
+  agreement across every implementation in the run.
+
+- WP18 changes the compiler base and adds two changes
+  (kernels untouched). The base is now the Krell main
+  tree: v3.0 (indirect calls, cmpxchg and the RMW
+  family, fences, volatile loads/stores, i128, the
+  variadic descriptor) merged over the WP17 compiler;
+  measured on its own before WP18, that base records
+  native ex-fib S 1.704 and LLVM 1.599 in this harness.
+  WP18 itself is (a) a scalar unrolling pass for
+  counted loops the vectorizer leaves scalar -- a
+  guard block (bound - ind >= 4*step) feeding four
+  chained body clones, with the original loop kept as
+  the remainder -- and (b) a backend fix it exposed:
+  the x86 packed-blend fold for span's pixel math
+  fired once per function, so unrolled clones emitted
+  the long scalar chain; it now folds one match per
+  block. Interleaved A/B against the v3.0 compiler:
+  span +7.6% S median (9/9 pairs), mix +1.7% S (7/7
+  pairs), the rest ties or byte-identical hot loops
+  (the unroll fires on copy/saxpy's vectorizer tail
+  loops only). Read against the v3.0-base record, this
+  run's geomean S against C -O2 is native 1.811
+  excluding fib and LLVM 1.592; record-to-record
+  geomeans on this host are layout-sensitive (this
+  run's sumsq row, +45% against the base record, is
+  a tie under interleaved A/B), so the A/B figures
+  above are the verified deltas. Gates: clean build
+  under -Werror, test suite green, differential
+  batteries at 4,662 cases with 0 failures on x86_64
+  and LLVM (AArch64/RISC-V lanes are generation-only
+  on this machine), fuzz clean on x86_64 seeds 1-3
+  (opt), and all twelve kernels' checksums in
   agreement across every implementation in the run.
 
 The deterministic property no column can show: the Krell rows are
