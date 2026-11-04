@@ -65,10 +65,10 @@ The Krell LLVM rows come from a fourth harness binary built the
 same way; it links the C -O2 references, verifies every checksum
 against them internally, and emits only its own rows.
 
-## Results (2026-11-03, v2.0 branch, WP15 run)
+## Results (2026-11-03, v2.0 branch, WP16 run)
 
 Run on the bench machine: AMD EPYC 9D25, gcc 13.3 -O2, Krell
-v2.0 tree (WP1-WP15). The LLVM lane of this run was built
+v2.0 tree (WP1-WP16). The LLVM lane of this run was built
 with clang 18 (the emscripten-bundled clang 19 used for the
 WP8-WP11 records was lost with its VM image); the lane's
 differential battery passes 4,546/0 under it. Best per-call
@@ -76,18 +76,18 @@ nanoseconds from `results/results.json`:
 
 | kernel | C -O0 | C -O1 | C -O2 | Krell | Krell LLVM | Krell interp | Python | NumPy |
 |---|---|---|---|---|---|---|---|---|
-| fill32 | 1.25M | 560.5K | 278.4K | 86.4K | 96.1K | 142.94M | 28.53M | 279.6K |
-| span | 23.0K | 13.4K | 12.8K | 8.7K | 9.8K | 1.91M | 2.15M | 76.0K |
-| sumsq | 1.83M | 718.0K | 759.6K | 401.1K | 567.5K | 162.04M | 60.05M | 1.12M |
-| fib | 17.30M | 17.36M | 4.84M | 24.7 | 10.1 | 1338.31M | 421.01M | -- |
-| histo | 6.75M | 2.26M | 2.26M | 2.23M | 2.22M | 755.51M | 178.15M | 15.23M |
-| fnv1a | 9.02M | 9.04M | 8.89M | 8.91M | 8.92M | 662.30M | 520.67M | -- |
-| dot | 1.91M | 781.5K | 759.8K | 563.0K | 423.6K | 203.88M | 81.46M | 1.24M |
-| saxpy | 2.23M | 724.3K | 730.8K | 193.2K | 279.3K | 201.97M | 131.29M | 525.8K |
-| copy | 1.61M | 566.8K | 568.2K | 186.9K | 190.2K | 166.03M | 39.53M | 158.6K |
-| bytesum | 5.25M | 2.23M | 2.23M | 647.5K | 602.3K | 637.17M | 110.98M | 3.41M |
-| parse | 2.37M | 1.09M | 1.05M | 977.9K | 1.02M | 484.25M | 20.14M | -- |
-| mix | 3.51M | 1.85M | 1.87M | 1.88M | 2.17M | 248.94M | 611.01M | 2.91M |
+| fill32 | 2.13M | 573.3K | 286.5K | 143.5K | 148.4K | 214.85M | 36.49M | 305.4K |
+| span | 32.3K | 16.8K | 19.4K | 11.1K | 11.7K | 2.35M | 2.75M | 96.6K |
+| sumsq | 2.84M | 617.7K | 1.15M | 573.5K | 582.3K | 232.17M | 78.64M | 1.16M |
+| fib | 22.58M | 19.52M | 6.58M | 54.7 | 11.3 | 1692.17M | 507.45M | -- |
+| histo | 10.34M | 2.61M | 2.92M | 2.41M | 2.35M | 1064.28M | 249.65M | 16.04M |
+| fnv1a | 10.62M | 9.08M | 9.22M | 9.14M | 9.11M | 964.91M | 674.53M | -- |
+| dot | 2.80M | 806.2K | 606.7K | 717.2K | 718.2K | 314.55M | 104.68M | 1.18M |
+| saxpy | 3.65M | 987.1K | 667.8K | 214.5K | 321.9K | 304.55M | 161.88M | 653.8K |
+| copy | 2.81M | 1.15M | 570.7K | 173.4K | 181.3K | 235.56M | 47.24M | 181.0K |
+| bytesum | 8.91M | 2.50M | 2.48M | 859.3K | 797.0K | 922.23M | 146.74M | 3.52M |
+| parse | 3.70M | 1.50M | 1.37M | 1.31M | 1.39M | 639.87M | 28.48M | -- |
+| mix | 7.28M | 2.35M | 2.45M | 2.34M | 3.09M | 344.92M | 746.50M | 3.97M |
 
 ## Reading the results
 
@@ -481,6 +481,49 @@ nanoseconds from `results/results.json`:
   AArch64, RISC-V, and LLVM, and all twelve kernels'
   checksums in agreement across every implementation in
   the run.
+
+- WP16 is an allocation and loop-shape pass in the
+  compiler (kernels untouched). The back-edge coalescing
+  in the shared allocator previously required a value's
+  only use to be a branch argument, so the updated values
+  of a vectorizer-unrolled body -- passed to both the
+  back edge and the exit edge of one conditional branch
+  -- never coalesced, and the edge moves shuffled every
+  loop-carried pointer through scratch registers each
+  iteration. Coalescing now accepts any value whose uses
+  are exactly a terminator's argument lists, and the
+  allocator's active-span accounting extends the target
+  parameter's entry to cover the coalesced value's span:
+  without the extension, a value defined early in a wide
+  body had no active entry holding its register, and a
+  later value could be allocated into it mid-loop (this
+  bench's checksum validation caught the resulting dot
+  miscompile during development; the fix also closes the
+  same latent gap for the original sole-use rule). The
+  optimizer also rotates the canonical counted loop: the
+  header compare is cloned at the end of the body, fed
+  with the body's outgoing values, so the per-iteration
+  path no longer jumps back to a separate check block;
+  the header remains as the entry guard. An interleaved
+  A/B against the WP15 compiler (per-round ratios, the
+  stable reading on this host) shows mix +4.5% S, dot and
+  sumsq up, saxpy up, bytesum -1% ns, and the rest within
+  noise; fnv1a is unchanged -- its loop is a serial
+  multiply chain both compilers emit identically. This
+  record's geomeans read below the WP15 record (native
+  4.175 across all twelve, 1.642 excluding fib; LLVM
+  4.462 and 1.529) because dot and fill32 landed in slow
+  array-layout regimes in the record processes -- the
+  layout sensitivity the WP15 entry documents for dot.
+  Isolated fixed-layout runs measure fill32 unchanged
+  and dot improved, and the fib row's 54.7 ns is the
+  same layout effect on a 25 ns kernel whose emitted
+  code is byte-identical to WP15's. Gates: clean build
+  under -Werror, test suite green, all four differential
+  batteries at 4,546 cases with 0 failures, fuzz clean
+  on x86_64 seeds 1-4 (opt) and seed 2 on AArch64 and
+  LLVM, and all twelve kernels' checksums in agreement
+  across every implementation in the run.
 
 The deterministic property no column can show: the Krell rows are
 produced by a total, verified IR whose outputs are byte-identical
