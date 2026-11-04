@@ -65,10 +65,10 @@ The Krell LLVM rows come from a fourth harness binary built the
 same way; it links the C -O2 references, verifies every checksum
 against them internally, and emits only its own rows.
 
-## Results (2026-11-03, v2.0 branch, WP14 run)
+## Results (2026-11-03, v2.0 branch, WP15 run)
 
 Run on the bench machine: AMD EPYC 9D25, gcc 13.3 -O2, Krell
-v2.0 tree (WP1-WP14). The LLVM lane of this run was built
+v2.0 tree (WP1-WP15). The LLVM lane of this run was built
 with clang 18 (the emscripten-bundled clang 19 used for the
 WP8-WP11 records was lost with its VM image); the lane's
 differential battery passes 4,546/0 under it. Best per-call
@@ -76,18 +76,18 @@ nanoseconds from `results/results.json`:
 
 | kernel | C -O0 | C -O1 | C -O2 | Krell | Krell LLVM | Krell interp | Python | NumPy |
 |---|---|---|---|---|---|---|---|---|
-| fill32 | 1.24M | 555.8K | 279.5K | 89.0K | 88.9K | 148.59M | 29.86M | 281.6K |
-| span | 25.1K | 13.4K | 12.9K | 8.9K | 9.8K | 1.81M | 2.27M | 77.7K |
-| sumsq | 1.89M | 723.1K | 768.4K | 403.0K | 569.6K | 165.28M | 59.46M | 1.13M |
-| fib | 17.23M | 17.14M | 4.89M | 24.7 | 10.0 | 1342.04M | 420.11M | -- |
-| histo | 6.75M | 2.29M | 2.26M | 2.23M | 2.21M | 717.34M | 180.19M | 14.42M |
-| fnv1a | 9.01M | 9.21M | 8.97M | 8.94M | 8.94M | 678.06M | 522.85M | -- |
-| dot | 1.92M | 804.6K | 779.9K | 770.9K | 741.8K | 198.52M | 85.89M | 1.14M |
-| saxpy | 2.25M | 726.5K | 738.4K | 191.5K | 290.4K | 225.22M | 141.84M | 500.4K |
-| copy | 1.61M | 569.5K | 571.2K | 187.1K | 187.5K | 174.84M | 39.39M | 148.8K |
-| bytesum | 5.25M | 2.25M | 2.25M | 642.4K | 605.1K | 644.02M | 112.78M | 3.44M |
-| parse | 2.36M | 1.08M | 1.06M | 967.2K | 1.03M | 478.74M | 20.10M | -- |
-| mix | 3.45M | 1.88M | 1.86M | 1.93M | 2.15M | 224.05M | 615.64M | 2.76M |
+| fill32 | 1.25M | 560.5K | 278.4K | 86.4K | 96.1K | 142.94M | 28.53M | 279.6K |
+| span | 23.0K | 13.4K | 12.8K | 8.7K | 9.8K | 1.91M | 2.15M | 76.0K |
+| sumsq | 1.83M | 718.0K | 759.6K | 401.1K | 567.5K | 162.04M | 60.05M | 1.12M |
+| fib | 17.30M | 17.36M | 4.84M | 24.7 | 10.1 | 1338.31M | 421.01M | -- |
+| histo | 6.75M | 2.26M | 2.26M | 2.23M | 2.22M | 755.51M | 178.15M | 15.23M |
+| fnv1a | 9.02M | 9.04M | 8.89M | 8.91M | 8.92M | 662.30M | 520.67M | -- |
+| dot | 1.91M | 781.5K | 759.8K | 563.0K | 423.6K | 203.88M | 81.46M | 1.24M |
+| saxpy | 2.23M | 724.3K | 730.8K | 193.2K | 279.3K | 201.97M | 131.29M | 525.8K |
+| copy | 1.61M | 566.8K | 568.2K | 186.9K | 190.2K | 166.03M | 39.53M | 158.6K |
+| bytesum | 5.25M | 2.23M | 2.23M | 647.5K | 602.3K | 637.17M | 110.98M | 3.41M |
+| parse | 2.37M | 1.09M | 1.05M | 977.9K | 1.02M | 484.25M | 20.14M | -- |
+| mix | 3.51M | 1.85M | 1.87M | 1.88M | 2.17M | 248.94M | 611.01M | 2.91M |
 
 ## Reading the results
 
@@ -421,6 +421,66 @@ nanoseconds from `results/results.json`:
   verified, fuzz parity with WP13 unchanged, and all
   twelve kernels' checksums in agreement across every
   implementation in the run.
+
+- WP15 is a correctness pass first and a performance pass
+  second (kernels untouched). Nine shipped bug classes were
+  reproduced, fixed, and covered by new reproducers: the
+  x86_64 early-return specialization skipped materializing
+  entry constants and compared narrow parameters at full
+  ABI width (a recursive i32 fib driven from C crashed on
+  negative inputs); the vector unsigned-divide op fell
+  through to the multiply path when its operands were
+  register-resident; the scalarized vector path read slot
+  offsets of register-resident operands (offset 0, the
+  saved frame); extracting an f32 vector lane above 0 read
+  the extraction scratch register instead of the source;
+  AArch64 and RISC-V addressed every vector through slot
+  offset 0 because the shared allocator register-allocates
+  single-unit vectors those backends treat as
+  memory-resident, and their emitters lacked the
+  dead-value filter the x86_64 emitter has always had, so
+  dead block arguments were moved over the saved frame;
+  an AArch64 lane load used the value register as the
+  address base for the second operand. The deepest was in
+  the shared allocator's liveness: when a backend folds an
+  instruction into its consumer (an address computation
+  into a load/store addressing mode), the folded value's
+  operands are read at the consumer, but liveness recorded
+  their uses at the folded instruction, so a value defined
+  in between could take the operand's register and the
+  consumer read the wrong address -- the root cause of
+  the long-standing fuzz seed 1 crash and seed 2 memory
+  mismatches. Liveness now expands folded uses recursively
+  at every census site. With these fixes the AArch64 and
+  RISC-V differential batteries run under emulation and
+  pass 4,546/0 for the first time (previous records
+  verified code generation only), and the fuzzer is clean
+  on all four backends. The performance change is one
+  gate: the two-stream reduction class now fires for i64
+  elements, taking the scalar-unroll body whose register
+  pressure the WP14 Belady allocator holds spill-free;
+  the gate had excluded i64 since a pre-Belady spill
+  measurement. dot moves from 0.988 to 0.741 native and
+  from 0.951 to 0.558 on the LLVM lane (per-call Krell
+  time over C -O2 time);
+  a v2i64 vector body for the same shape was measured and
+  rejected (about 9% slower than the unroll -- the
+  decomposed 64-bit vector multiply costs more than four
+  independent scalar multiply chains). An interleaved A/B
+  against the WP14 compiler confirms dot -23.5% native
+  and -44.3% LLVM with all other kernels within host
+  noise; dot's absolute times vary by bench process on
+  this host (array layout), so the ratios are the stable
+  reading. Geomean S against C -O2: native 11.020 across
+  the original six, 4.651 across all twelve (1.766
+  excluding fib); LLVM 11.618 and 4.690 (1.643 excluding
+  fib). Gates: clean build under -Werror, test suite
+  green, all four differential batteries at 4,546 cases
+  with 0 failures (AArch64 and RISC-V executed under
+  qemu), fuzz clean on x86_64 seeds 1-7 and on seed 2 for
+  AArch64, RISC-V, and LLVM, and all twelve kernels'
+  checksums in agreement across every implementation in
+  the run.
 
 The deterministic property no column can show: the Krell rows are
 produced by a total, verified IR whose outputs are byte-identical
