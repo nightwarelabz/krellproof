@@ -65,10 +65,10 @@ The Krell LLVM rows come from a fourth harness binary built the
 same way; it links the C -O2 references, verifies every checksum
 against them internally, and emits only its own rows.
 
-## Results (2026-11-03, v2.0 branch, WP16 run)
+## Results (2026-11-03, v2.0 branch, WP17 run)
 
 Run on the bench machine: AMD EPYC 9D25, gcc 13.3 -O2, Krell
-v2.0 tree (WP1-WP16). The LLVM lane of this run was built
+v2.0 tree (WP1-WP17). The LLVM lane of this run was built
 with clang 18 (the emscripten-bundled clang 19 used for the
 WP8-WP11 records was lost with its VM image); the lane's
 differential battery passes 4,546/0 under it. Best per-call
@@ -76,18 +76,18 @@ nanoseconds from `results/results.json`:
 
 | kernel | C -O0 | C -O1 | C -O2 | Krell | Krell LLVM | Krell interp | Python | NumPy |
 |---|---|---|---|---|---|---|---|---|
-| fill32 | 2.13M | 573.3K | 286.5K | 143.5K | 148.4K | 214.85M | 36.49M | 305.4K |
-| span | 32.3K | 16.8K | 19.4K | 11.1K | 11.7K | 2.35M | 2.75M | 96.6K |
-| sumsq | 2.84M | 617.7K | 1.15M | 573.5K | 582.3K | 232.17M | 78.64M | 1.16M |
-| fib | 22.58M | 19.52M | 6.58M | 54.7 | 11.3 | 1692.17M | 507.45M | -- |
-| histo | 10.34M | 2.61M | 2.92M | 2.41M | 2.35M | 1064.28M | 249.65M | 16.04M |
-| fnv1a | 10.62M | 9.08M | 9.22M | 9.14M | 9.11M | 964.91M | 674.53M | -- |
-| dot | 2.80M | 806.2K | 606.7K | 717.2K | 718.2K | 314.55M | 104.68M | 1.18M |
-| saxpy | 3.65M | 987.1K | 667.8K | 214.5K | 321.9K | 304.55M | 161.88M | 653.8K |
-| copy | 2.81M | 1.15M | 570.7K | 173.4K | 181.3K | 235.56M | 47.24M | 181.0K |
-| bytesum | 8.91M | 2.50M | 2.48M | 859.3K | 797.0K | 922.23M | 146.74M | 3.52M |
-| parse | 3.70M | 1.50M | 1.37M | 1.31M | 1.39M | 639.87M | 28.48M | -- |
-| mix | 7.28M | 2.35M | 2.45M | 2.34M | 3.09M | 344.92M | 746.50M | 3.97M |
+| fill32 | 2.14M | 576.6K | 286.8K | 142.4K | 148.1K | 213.54M | 36.42M | 304.9K |
+| span | 32.3K | 16.9K | 19.5K | 11.1K | 12.8K | 2.30M | 2.70M | 98.1K |
+| sumsq | 2.84M | 625.8K | 1.15M | 574.1K | 647.0K | 223.70M | 80.86M | 1.18M |
+| fib | 22.45M | 19.73M | 6.45M | 53.4 | 11.3 | 1719.46M | 524.93M | -- |
+| histo | 10.35M | 2.65M | 2.90M | 2.40M | 2.37M | 1060.70M | 256.45M | 15.78M |
+| fnv1a | 10.62M | 9.17M | 9.21M | 9.19M | 9.27M | 987.06M | 707.07M | -- |
+| dot | 2.84M | 787.2K | 623.0K | 685.7K | 685.8K | 312.97M | 105.74M | 1.17M |
+| saxpy | 3.64M | 1.01M | 674.8K | 214.4K | 291.5K | 313.60M | 167.06M | 648.4K |
+| copy | 2.82M | 1.15M | 586.7K | 192.1K | 184.1K | 236.68M | 49.52M | 177.0K |
+| bytesum | 8.95M | 2.37M | 2.46M | 853.5K | 781.7K | 916.69M | 142.83M | 3.51M |
+| parse | 3.69M | 1.50M | 1.38M | 1.25M | 1.43M | 625.06M | 28.64M | -- |
+| mix | 7.50M | 2.36M | 2.51M | 2.34M | 2.13M | 334.51M | 801.03M | 3.97M |
 
 ## Reading the results
 
@@ -524,6 +524,40 @@ nanoseconds from `results/results.json`:
   on x86_64 seeds 1-4 (opt) and seed 2 on AArch64 and
   LLVM, and all twelve kernels' checksums in agreement
   across every implementation in the run.
+
+- WP17 is one allocator rule (kernels untouched): the
+  Belady victim scan now prefers rematerializable values
+  -- constants -- over any non-constant victim. Most
+  emitter sites fold a spilled constant back into an
+  immediate and never read its slot, so evicting one is
+  nearly free; the wrap-aware next-use otherwise ranks a
+  loop body's hot pointer (its next use is next
+  iteration's, wrapped) as farther than a constant used
+  once per iteration, and a one-instruction temp's
+  pressure point evicted parse's input pointer for its
+  whole interval -- a stack reload on every byte. The
+  pointer now stays in a register; the evicted constant
+  zero is reloaded only on token boundaries. An
+  interleaved A/B against the WP16 compiler shows parse
+  +4.6% S and bytesum +3.6% S, the rest within noise,
+  and this record's parse row (1.105 native) carries the
+  gain. Two investigations closed with no change: a
+  temp-vs-carrier tie-break for span's width/step spills
+  was measured and reverted (it spilled the body's whole
+  temp chain -- more slot traffic than the two reloads
+  it removed; span's live set genuinely exceeds the
+  register pool and Belady's choice is near-optimal for
+  it), and the mix LLVM rows that read below 1.0 in some
+  records are the same layout effect -- an isolated
+  fixed-layout run measures the LLVM lane's mix at
+  1.161 against C, and this record reads 1.175.
+  Geomean S against C -O2: native 4.212 across all
+  twelve (1.657 excluding fib); LLVM 4.592 (1.581
+  excluding fib). Gates: clean build under -Werror,
+  test suite green, all four differential batteries at
+  4,546 cases with 0 failures, fuzz clean on x86_64
+  seeds 1-3 (opt), and all twelve kernels' checksums in
+  agreement across every implementation in the run.
 
 The deterministic property no column can show: the Krell rows are
 produced by a total, verified IR whose outputs are byte-identical
